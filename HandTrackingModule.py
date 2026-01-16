@@ -3,6 +3,23 @@ import time
 import cv2
 import mediapipe as mp
 
+"""
+HandTrackingModule - Real-time Hand Landmark Detection
+
+Originally built for gesture-based cursor control, this module provides the
+foundational layer for sign language motion capture. MediaPipe's 21-point
+hand tracking captures the four core parameters of sign language:
+
+1. Handshape - via landmark relationships (finger positions)
+2. Location - via 2D coordinates (x, y)
+3. Movement - via temporal sequences (tracking over time)
+4. Orientation - via landmark directions (wrist to fingertips)
+
+This module is motion-capture agnostic: it extracts landmarks, which can
+drive cursor control, animation systems, JSON logging, or ML models.
+
+Key Design Principle: Separate motion capture from output action.
+"""
 
 class handDetector:
     mpHands = mp.solutions.hands
@@ -39,6 +56,17 @@ class handDetector:
         return img
 
     def findPosition(self, img, handNo=0, draw=True):
+        """
+    Extract landmark positions from detected hand.
+    
+    Returns structured list of landmarks with their 2D coordinates.
+    Critical for sign language: these coordinates are the raw data
+    from which handshape, location, and movement are derived.
+    
+    Returns:
+        lmList: [[id, x, y], ...] - 21 landmarks per hand
+        bbox: [xmin, ymin, xmax, ymax] - bounding box
+    """
         xList = []
         yList = []
         bbox = []
@@ -67,6 +95,21 @@ class handDetector:
         return self.lmList, bbox
 
     def fingersUp(self):
+        """
+    Detect which fingers are extended (0 = down, 1 = up).
+    
+    Returns [thumb, index, middle, ring, pinky]
+    
+    This is a basic handshape classifier. In sign language, handshape
+    is one of the four critical parameters. This method captures finger
+    extension but doesn't capture:
+    - Finger curl/bend amount
+    - 3D orientation
+    - Relative finger positions
+    
+    Future: More sophisticated handshape classification needed for
+    full sign language vocabulary.
+    """
         fingers = []
         # Thumb
         if self.lmList[self.tiplds[0]][1] > self.lmList[self.tiplds[0] - 1][1]:
