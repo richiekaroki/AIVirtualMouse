@@ -22,6 +22,28 @@ Sign language translation requires treating motion as **linguistic infrastructur
 
 ---
 
+## Requirements
+
+- **Python 3.11** (Python 3.13+ not yet supported by MediaPipe)
+- See `requirements.txt` for dependencies
+
+### Why Python 3.11?
+
+MediaPipe (required for hand tracking) currently supports Python 3.8-3.11.
+Python 3.13 support is in development.
+
+### Installation
+
+```bash
+# Create virtual environment with Python 3.11
+py -3.11 -m venv venv
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/Mac
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
 ## 🎨 Enhanced User Interface
 
 The project includes two versions:
