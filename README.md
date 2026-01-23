@@ -3,7 +3,7 @@
 ### From Gesture Recognition to Sign Language Infrastructure
 
 [![Status](https://img.shields.io/badge/status-active-success.svg)]()
-[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)]()
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)]()
 [![Focus](https://img.shields.io/badge/focus-accessibility%20tech-purple.svg)]()
 
@@ -127,26 +127,62 @@ Sign languages are complete, complex languages built from four core parameters:
 ### Prerequisites
 
 ```bash
-# Python 3.8 or higher
+# Python 3.11 REQUIRED (MediaPipe does not support 3.12+)
 python --version
 
-# Install dependencies
-pip install -r requirements.txt
+# Should show Python 3.11.x
 ```
 
+**In "Installation" section, add:**
+
+````markdown
 ### Installation
 
+**IMPORTANT: Python 3.11 Required**
+
+This project requires Python 3.11 because MediaPipe (hand tracking library) does not yet support Python 3.12+.
+
 ```bash
+# Verify Python 3.11 is installed
+py -3.11 --version
+
 # Clone repository
 git clone https://github.com/richiekaroki/AIVirtualMouse.git
 cd AIVirtualMouse
 
-# Install requirements
-pip install opencv-python mediapipe numpy pyautogui matplotlib
+# Create virtual environment with Python 3.11
+py -3.11 -m venv venv
 
-# Verify installation
-python -c "import cv2, mediapipe; print('✓ Ready')"
+# Activate (Windows)
+venv\Scripts\activate
+
+# Activate (Mac/Linux)
+source venv/bin/activate
+
+# Install requirements
+pip install -r requirements.txt
 ```
+
+**Add a "Python Version" section before Quick Start:**
+
+```markdown
+## 🐍 Python Version Requirement
+
+**This project requires Python 3.11**
+
+### Why Python 3.11?
+
+MediaPipe, the hand tracking library used in this project, currently supports Python 3.8-3.11. Python 3.12+ support is under development by the MediaPipe team.
+
+### Installation
+
+1. Download Python 3.11.9 from [python.org](https://www.python.org/downloads/)
+2. Install with "Add to PATH" checked
+3. Verify: `py -3.11 --version`
+4. Create venv: `py -3.11 -m venv venv`
+```
+
+---
 
 ### Basic Usage
 
@@ -719,3 +755,4 @@ If you're a member of the deaf community or a sign language expert and have feed
 _This project treats motion as linguistic data, not just visual patterns. Every design decision prioritizes semantic accuracy and accessibility over visual effects._
 
 _Last generated: January 2026_
+````
