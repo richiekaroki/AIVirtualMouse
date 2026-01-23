@@ -11,17 +11,14 @@ Sign languages are complete, complex languages with their own grammar and struct
 ### The Four Core Parameters of Sign Language
 
 1. **Handshape** - Configuration of fingers and thumb
-
    - _Captured by:_ MediaPipe's 21 hand landmarks
    - _Current status:_ ✅ Fully implemented via finger position detection
 
 2. **Location** - Where the sign is performed (in space relative to body)
-
    - _Captured by:_ 2D coordinates of hand landmarks
    - _Current status:_ ✅ Implemented with coordinate mapping and normalization
 
 3. **Movement** - How the hand transitions through space
-
    - _Captured by:_ Temporal sequences of landmark positions
    - _Current status:_ ⚠️ Partially implemented (smoothing exists, sequence logging planned)
 
@@ -55,31 +52,26 @@ This existing functionality provides the **foundational layer** for sign languag
 ### Currently Missing (Planned Extensions)
 
 1. **Motion as Structured Data**
-
    - Need: Export motion to reusable format (JSON)
    - Why: Training data, validation, animation retargeting
    - Status: 🔄 In progress
 
 2. **Temporal Sequence Capture**
-
    - Need: Record gestures over time, not just single frames
    - Why: Signs are sequences with meaning in motion
    - Status: 🔄 In progress
 
 3. **Gesture Primitive Classification**
-
    - Need: Explicit labels for basic motion patterns
    - Why: Building blocks for complex signs
    - Status: 🔄 In progress
 
 4. **Full Body Pose**
-
    - Need: MediaPipe Pose integration (upper body, face)
    - Why: Signs use body position and facial expressions
    - Status: 📋 Planned
 
 5. **Facial Landmark Tracking**
-
    - Need: MediaPipe Face Mesh integration
    - Why: Facial expressions are grammatical markers in sign language
    - Status: 📋 Planned
@@ -169,17 +161,14 @@ This project approaches animation as **data infrastructure**, not artistic work.
 This motion capture pipeline could support:
 
 1. **Sign Language Translation Systems**
-
    - Text/speech → sign language animation
    - Real-time translation for accessibility
 
 2. **Sign Language Education**
-
    - Teaching tools with motion feedback
    - Standardized sign databases
 
 3. **Research & Documentation**
-
    - Linguistic analysis of sign languages
    - Preservation of regional variations
 
@@ -204,10 +193,54 @@ This work is motivated by the need for better sign language accessibility techno
 - **Data Format:** JSON (planned)
 - **Visualization:** Matplotlib (planned)
 
+## Integration Status
+
+### What's Implemented ✅
+
+- ✅ Real-time hand tracking (21 landmarks, 30fps)
+- ✅ Handshape parameter (finger states, landmark relationships)
+- ✅ Location parameter (2D coordinates, normalized)
+- ✅ Movement parameter (velocity, trajectory, temporal sequences)
+- ✅ Motion descriptor abstraction (structured data representation)
+- ✅ JSON export pipeline (training data generation)
+- ✅ Comprehensive analysis tools (visualization, statistics)
+- ✅ Quality dataset (45 recordings, 15 gestures)
+
+### What's Planned 📋
+
+- 📋 Orientation parameter (3D landmark analysis)
+- 📋 MediaPipe Pose integration (body position context)
+- 📋 MediaPipe Face Mesh (facial expressions/non-manual markers)
+- 📋 Two-handed coordination tracking
+- 📋 Animation system integration (3D rigs, keyframes)
+- 📋 Deaf community validation framework
+- 📋 Sign language gloss annotation tools
+
+### Current Capability Assessment
+
+**For Sign Language Translation:**
+
+- **Foundation:** Excellent - captures 3/4 core parameters as structured data
+- **Research:** Suitable - comprehensive analysis and visualization tools
+- **Training Data:** Ready - JSON export with quality metrics
+- **Production Use:** Not yet - needs facial tracking, body context, community validation
+
+**Recommended Use Cases:**
+
+1. ✅ Sign language motion research and analysis
+2. ✅ Training data collection for ML models
+3. ✅ Gesture recognition system prototyping
+4. ✅ Accessibility technology development
+5. ⚠️ Sign language translation (with extensions)
+
+---
+
+_For the complete technical system, see the main [README.md](README.md)_
+
 ## Contact
 
 Richard Kabue Karoki  
-karokirichard522@gmail.com  
+<karokirichard522@gmail.com>  
 Nairobi, Kenya
 
 ---

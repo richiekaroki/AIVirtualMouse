@@ -1,8 +1,4 @@
 {
-    "cSpell.words": [
-        "autopy",
-        "mediapipe",
-        "pyautogui",
-        "tiplds"
-    ]
+  "cSpell.words": ["autopy", "mediapipe", "pyautogui", "tiplds"],
+  "git.ignoreLimitWarning": true
 }
