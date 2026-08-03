@@ -368,8 +368,17 @@ Examples:
     parser.add_argument('--compare', '-c', action='store_true', help='Compare two gestures')
     parser.add_argument('--plot', choices=['trajectory', 'primitives', 'velocity', 'openness', 'distribution'],
                         help='Generate specific plot only')
+    parser.add_argument('--version', '-v', action='version', version="%(prog)s 0.7.0")
+    parser.add_argument('--verbose', action='store_true', help='Enable verbose logging')
 
     args = parser.parse_args()
+
+    # Configure logging
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
 
     if args.compare:
         if len(args.files) != 2:

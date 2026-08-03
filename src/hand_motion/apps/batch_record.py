@@ -133,6 +133,7 @@ def record_single_gesture(gesture_name, description, attempt_num, cap, detector,
 def main():
     parser = argparse.ArgumentParser(description="Batch gesture recording")
     parser.add_argument("--camera", "-c", type=int, default=0, help="Camera index")
+    parser.add_argument("--version", "-v", action="version", version="%(prog)s 0.7.0")
     args = parser.parse_args()
 
     print("\n" + "=" * 70)

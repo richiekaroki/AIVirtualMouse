@@ -34,6 +34,7 @@ def parse_args():
                         help="Camera index (default: 0)")
     parser.add_argument("--width", type=int, default=640, help="Camera width")
     parser.add_argument("--height", type=int, default=480, help="Camera height")
+    parser.add_argument("--version", "-v", action="version", version="%(prog)s 0.7.0")
     return parser.parse_args()
 
 

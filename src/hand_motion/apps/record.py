@@ -19,6 +19,7 @@ def main():
     parser.add_argument("--name", "-n", type=str, help="Gesture name")
     parser.add_argument("--duration", "-d", type=int, default=3, help="Duration in seconds")
     parser.add_argument("--camera", "-c", type=int, default=0, help="Camera index")
+    parser.add_argument("--version", "-v", action="version", version="%(prog)s 0.7.0")
     args = parser.parse_args()
 
     gesture_name = args.name or input("Enter gesture name: ").strip()
