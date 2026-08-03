@@ -87,16 +87,16 @@ Documentation improvements are always welcome!
 
 ### Medium Priority
 
-5. **Testing** - Unit tests, integration tests, edge case handling
-6. **Documentation** - Examples, tutorials, video guides
-7. **Performance** - Optimization, profiling, memory management
-8. **UI/UX** - Interface improvements, accessibility features
+1. **Testing** - Unit tests, integration tests, edge case handling
+2. **Documentation** - Examples, tutorials, video guides
+3. **Performance** - Optimization, profiling, memory management
+4. **UI/UX** - Interface improvements, accessibility features
 
 ### Always Welcome
 
-9. **Bug fixes** - Any size, any module
-10. **Code cleanup** - Refactoring, removing duplication
-11. **Example code** - Demonstrating features
+1. **Bug fixes** - Any size, any module
+2. **Code cleanup** - Refactoring, removing duplication
+3. **Example code** - Demonstrating features
 
 ## Development Setup
 
@@ -122,7 +122,7 @@ python -m hand_motion.apps.cursor_enhanced
 ## Questions?
 
 - Open an issue with the "question" label
-- Email: karokirichard522@gmail.com
+- Email: <karokirichard522@gmail.com>
 - Be patient - this is a personal project with limited maintainer time
 
 ## Recognition

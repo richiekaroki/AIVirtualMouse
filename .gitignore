@@ -52,6 +52,7 @@ motion_data/*.json
 analysis_plots/*.png
 dataset_summary.md
 *.pyc
+*.task
 
 # Build artifacts
 *.spec
