@@ -7,14 +7,53 @@ Provides finger state detection and inter-landmark distance calculations.
 
 import math
 import time
+import logging
+from typing import List, Tuple, Optional, Any
+
 import cv2
+import numpy as np
 from cvzone.HandTrackingModule import HandDetector as CvzoneHandDetector
 
+logger = logging.getLogger(__name__)
 
-class handDetector:
-    """Hand tracking detector compatible with Python 3.13+"""
+# Type aliases
+LandmarkList = List[List[float]]
+BoundingBox = List[int]
 
-    def __init__(self, mode=False, maxHands=2, detectionCon=0.5, trackCon=0.5):
+
+class HandDetector:
+    """
+    Hand tracking detector compatible with Python 3.13+
+
+    Attributes:
+        mode: Detection mode
+        maxHands: Maximum number of hands to detect
+        detectionCon: Detection confidence threshold
+        trackCon: Tracking confidence threshold
+        tipIds: Landmark IDs for fingertips
+    """
+
+    __slots__ = (
+        'mode', 'maxHands', 'detectionCon', 'trackCon',
+        'detector', 'tipIds', 'results', 'lmList'
+    )
+
+    def __init__(
+        self,
+        mode: bool = False,
+        maxHands: int = 2,
+        detectionCon: float = 0.5,
+        trackCon: float = 0.5
+    ) -> None:
+        """
+        Initialize hand detector.
+
+        Args:
+            mode: Static image mode (True) or video mode (False)
+            maxHands: Maximum number of hands to detect (1-2)
+            detectionCon: Detection confidence threshold (0.0-1.0)
+            trackCon: Tracking confidence threshold (0.0-1.0)
+        """
         self.mode = mode
         self.maxHands = maxHands
         self.detectionCon = detectionCon
@@ -25,26 +64,57 @@ class handDetector:
             maxHands=maxHands
         )
 
-        self.tipIds = [4, 8, 12, 16, 20]
-        self.results = None
-        self.lmList = []
+        self.tipIds: List[int] = [4, 8, 12, 16, 20]
+        self.results: Optional[List[Any]] = None
+        self.lmList: LandmarkList = []
 
-    def findHands(self, img, draw=True):
-        """Detect hands in image and optionally draw landmarks."""
+    def findHands(self, img: np.ndarray, draw: bool = True) -> np.ndarray:
+        """
+        Detect hands in image and optionally draw landmarks.
+
+        Args:
+            img: Input image (BGR format)
+            draw: Whether to draw landmarks on image
+
+        Returns:
+            Image with optional landmark drawings
+
+        Raises:
+            ValueError: If image is None or invalid
+        """
+        if img is None or img.size == 0:
+            logger.warning("Invalid image provided to findHands")
+            return img
+
         hands, img = self.detector.findHands(img, draw=draw)
         self.results = hands
         return img
 
-    def findPosition(self, img, handNo=0, draw=True):
+    def findPosition(
+        self,
+        img: np.ndarray,
+        handNo: int = 0,
+        draw: bool = True
+    ) -> Tuple[LandmarkList, BoundingBox]:
         """
         Extract landmark positions from detected hand.
 
+        Args:
+            img: Input image
+            handNo: Hand index (0 for first detected hand)
+            draw: Whether to draw landmarks on image
+
         Returns:
-            lmList: [[id, x, y], ...] - 21 landmarks per hand
-            bbox: [xmin, ymin, xmax, ymax] - bounding box
+            Tuple of (landmarks, bounding_box)
+            - landmarks: List of [id, x, y] for 21 points
+            - bounding_box: [xmin, ymin, xmax, ymax]
         """
         self.lmList = []
-        bbox = []
+        bbox: BoundingBox = []
+
+        if img is None or img.size == 0:
+            logger.warning("Invalid image provided to findPosition")
+            return self.lmList, bbox
 
         if self.results and len(self.results) > handNo:
             hand = self.results[handNo]
@@ -62,71 +132,107 @@ class handDetector:
 
         return self.lmList, bbox
 
-    def fingersUp(self):
-        """Detect which fingers are extended (0=down, 1=up). Returns [thumb, index, middle, ring, pinky]."""
-        fingers = []
+    def fingersUp(self) -> List[int]:
+        """
+        Detect which fingers are extended.
 
+        Returns:
+            List of 5 binary values [thumb, index, middle, ring, pinky]
+            where 1 = extended, 0 = closed
+        """
         if not self.results or len(self.results) == 0:
-            return fingers
+            return []
 
         hand = self.results[0]
         fingers = self.detector.fingersUp(hand)
         return fingers
 
-    def findDistance(self, p1, p2, img, draw=True, r=15, t=3):
+    def findDistance(
+        self,
+        p1: int,
+        p2: int,
+        img: np.ndarray,
+        draw: bool = True,
+        r: int = 15,
+        t: int = 3
+    ) -> Tuple[float, np.ndarray, BoundingBox]:
         """
         Calculate distance between two landmarks.
 
+        Args:
+            p1: First landmark index
+            p2: Second landmark index
+            img: Input image
+            draw: Whether to draw visualization
+            r: Circle radius for drawing
+            t: Line thickness for drawing
+
         Returns:
-            length: Euclidean distance
-            img: Image with optional drawings
-            lineInfo: [x1, y1, x2, y2, cx, cy]
+            Tuple of (distance, image, line_info)
+            - distance: Euclidean distance in pixels
+            - image: Image with optional drawings
+            - line_info: [x1, y1, x2, y2, cx, cy]
         """
         if len(self.lmList) == 0:
-            return 0, img, [0, 0, 0, 0, 0, 0]
+            return 0.0, img, [0, 0, 0, 0, 0, 0]
+
+        # Validate landmark indices
+        if p1 >= len(self.lmList) or p2 >= len(self.lmList):
+            logger.warning("Invalid landmark indices: %d, %d", p1, p2)
+            return 0.0, img, [0, 0, 0, 0, 0, 0]
 
         x1, y1 = self.lmList[p1][1:]
         x2, y2 = self.lmList[p2][1:]
         cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
 
         if draw:
-            cv2.line(img, (x1, y1), (x2, y2), (255, 0, 255), t)
-            cv2.circle(img, (x1, y1), r, (255, 0, 255), cv2.FILLED)
-            cv2.circle(img, (x2, y2), r, (255, 0, 255), cv2.FILLED)
-            cv2.circle(img, (cx, cy), r, (0, 0, 255), cv2.FILLED)
+            cv2.line(img, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 255), t)
+            cv2.circle(img, (int(x1), int(y1)), r, (255, 0, 255), cv2.FILLED)
+            cv2.circle(img, (int(x2), int(y2)), r, (255, 0, 255), cv2.FILLED)
+            cv2.circle(img, (int(cx), int(cy)), r, (0, 0, 255), cv2.FILLED)
 
         length = math.hypot(x2 - x1, y2 - y1)
         return length, img, [x1, y1, x2, y2, cx, cy]
 
 
+# Backward compatibility alias
+handDetector = HandDetector
+
+
 if __name__ == "__main__":
     pTime = 0
     cap = cv2.VideoCapture(0)
-    detector = handDetector()
 
-    while True:
-        success, img = cap.read()
-        if not success:
-            continue
+    if not cap.isOpened():
+        print("Error: Cannot open camera")
+        exit(1)
 
-        img = detector.findHands(img)
-        lmList, bbox = detector.findPosition(img)
+    detector = HandDetector()
 
-        if len(lmList) != 0:
-            fingers = detector.fingersUp()
-            cv2.putText(img, f"Fingers: {fingers}", (10, 110),
-                        cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 0), 2)
+    try:
+        while True:
+            success, img = cap.read()
+            if not success:
+                continue
 
-        cTime = time.time()
-        fps = 1 / (cTime - pTime) if (cTime - pTime) > 0 else 0
-        pTime = cTime
+            img = detector.findHands(img)
+            lmList, bbox = detector.findPosition(img)
 
-        cv2.putText(img, f"FPS: {int(fps)}", (10, 70),
-                    cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 255), 3)
-        cv2.imshow("Hand Tracking Test", img)
+            if len(lmList) != 0:
+                fingers = detector.fingersUp()
+                cv2.putText(img, f"Fingers: {fingers}", (10, 110),
+                            cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 0), 2)
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+            cTime = time.time()
+            fps = 1 / (cTime - pTime) if (cTime - pTime) > 0 else 0
+            pTime = cTime
 
-    cap.release()
-    cv2.destroyAllWindows()
+            cv2.putText(img, f"FPS: {int(fps)}", (10, 70),
+                        cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 255), 3)
+            cv2.imshow("Hand Tracking Test", img)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()

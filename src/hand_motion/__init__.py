@@ -18,16 +18,20 @@ Applications:
 """
 
 from hand_motion.descriptor import MotionDescriptor
+from hand_motion.descriptor import PRIMITIVE_MAP
 
 __version__ = "0.7.0"
-__all__ = ["MotionDescriptor"]
+__all__ = ["MotionDescriptor", "handDetector", "MotionAnalyzer", "GestureComparator"]
 
 
-def __getattr__(name):
+def __getattr__(name: str):
     """Lazy imports for heavy dependencies (cv2, matplotlib)."""
     if name == "handDetector":
         from hand_motion.detection import handDetector
         return handDetector
+    elif name == "HandDetector":
+        from hand_motion.detection import HandDetector
+        return HandDetector
     elif name == "MotionAnalyzer":
         from hand_motion.analyzer import MotionAnalyzer
         return MotionAnalyzer

@@ -9,10 +9,32 @@ import time
 import json
 import math
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Set, Any
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+# Primitive classification constants
+PRIMITIVE_MAP: Dict[Tuple[int, ...], str] = {
+    (0, 1, 0, 0, 0): "POINT",
+    (0, 1, 1, 0, 0): "PEACE_V",
+    (1, 1, 1, 1, 1): "OPEN_HAND",
+    (1, 0, 0, 0, 0): "THUMBS_UP",
+    (1, 1, 0, 0, 0): "PINCH_READY",  # May be OK_SIGN based on pinch distance
+    (0, 1, 1, 1, 0): "THREE",
+    (0, 1, 1, 1, 1): "FOUR",
+    (0, 0, 0, 0, 1): "PINKY",
+}
+
+# Hand landmark indices
+WRIST = 0
+THUMB_TIP = 4
+INDEX_TIP = 8
+MIDDLE_TIP = 12
+RING_TIP = 16
+PINKY_TIP = 20
+MIDDLE_BASE = 9
+INDEX_MCP = 5
 
 
 class MotionDescriptor:
@@ -26,15 +48,31 @@ class MotionDescriptor:
         max_history: Maximum frames to keep in memory (0 = unlimited)
     """
 
-    def __init__(self, max_history: int = 1000):
-        self.motion_history: List[Dict] = []
-        self.primitives_seen: set = set()
+    __slots__ = ('motion_history', 'primitives_seen', 'recording_start_time', 'max_history')
+
+    def __init__(self, max_history: int = 1000) -> None:
+        self.motion_history: List[Dict[str, Any]] = []
+        self.primitives_seen: Set[str] = set()
         self.recording_start_time: Optional[float] = None
         self.max_history: int = max_history or 0
 
-    def create_descriptor(self, lmList: List, fingers: List[int],
-                          frame_shape: Optional[Tuple[int, int]] = None) -> Optional[Dict]:
-        """Create a structured representation of hand motion state."""
+    def create_descriptor(
+        self,
+        lmList: List[List[float]],
+        fingers: List[int],
+        frame_shape: Optional[Tuple[int, int]] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Create a structured representation of hand motion state.
+
+        Args:
+            lmList: List of 21 landmarks as [id, x, y] or [x, y, z]
+            fingers: List of 5 binary values (0/1) for each finger
+            frame_shape: Optional (height, width) for coordinate normalization
+
+        Returns:
+            Dictionary containing structured motion data, or None if invalid input
+        """
         if not lmList or len(lmList) < 21:
             return None
         if not fingers or len(fingers) != 5:
@@ -45,21 +83,25 @@ class MotionDescriptor:
             self.recording_start_time = timestamp
         relative_time = timestamp - self.recording_start_time
 
-        descriptor = {
+        # Extract key landmarks once for reuse
+        wrist_x, wrist_y = lmList[WRIST][1], lmList[WRIST][2]
+        index_mcp_x = lmList[INDEX_MCP][1]
+
+        descriptor: Dict[str, Any] = {
             'timestamp': timestamp,
             'relative_time': relative_time,
             'frame_num': len(self.motion_history),
-            'hand': self._detect_hand(lmList),
+            'hand': self._detect_hand_from_positions(wrist_x, index_mcp_x),
             'fingers_extended': fingers,
             'finger_count': sum(fingers),
             'handshape_code': self._encode_handshape(fingers),
             'landmarks': {
-                'wrist': {'x': lmList[0][1], 'y': lmList[0][2]},
-                'thumb_tip': {'x': lmList[4][1], 'y': lmList[4][2]},
-                'index_tip': {'x': lmList[8][1], 'y': lmList[8][2]},
-                'middle_tip': {'x': lmList[12][1], 'y': lmList[12][2]},
-                'ring_tip': {'x': lmList[16][1], 'y': lmList[16][2]},
-                'pinky_tip': {'x': lmList[20][1], 'y': lmList[20][2]},
+                'wrist': {'x': wrist_x, 'y': wrist_y},
+                'thumb_tip': {'x': lmList[THUMB_TIP][1], 'y': lmList[THUMB_TIP][2]},
+                'index_tip': {'x': lmList[INDEX_TIP][1], 'y': lmList[INDEX_TIP][2]},
+                'middle_tip': {'x': lmList[MIDDLE_TIP][1], 'y': lmList[MIDDLE_TIP][2]},
+                'ring_tip': {'x': lmList[RING_TIP][1], 'y': lmList[RING_TIP][2]},
+                'pinky_tip': {'x': lmList[PINKY_TIP][1], 'y': lmList[PINKY_TIP][2]},
             },
             'features': {
                 'pinch_distance': self._calculate_pinch(lmList),
@@ -83,55 +125,108 @@ class MotionDescriptor:
 
         return descriptor
 
-    def _detect_hand(self, lmList: List) -> str:
-        """Detect whether the hand is left or right."""
-        if len(lmList) < 6:
-            return "unknown"
-        wrist_x = lmList[0][1]
-        index_mcp_x = lmList[5][1]
+    def _detect_hand_from_positions(self, wrist_x: float, index_mcp_x: float) -> str:
+        """
+        Detect whether the hand is left or right based on landmark positions.
+
+        Args:
+            wrist_x: X coordinate of wrist landmark
+            index_mcp_x: X coordinate of index finger MCP joint
+
+        Returns:
+            'right' if index MCP is to the right of wrist, 'left' otherwise
+        """
         return "right" if index_mcp_x > wrist_x else "left"
 
     def _encode_handshape(self, fingers: List[int]) -> str:
-        """Encode finger configuration as compact string (e.g. '11000')."""
+        """
+        Encode finger configuration as compact binary string.
+
+        Args:
+            fingers: List of 5 binary values [thumb, index, middle, ring, pinky]
+
+        Returns:
+            String like '11000' representing finger states
+        """
         return ''.join(str(f) for f in fingers)
 
-    def _calculate_pinch(self, lmList: List) -> float:
-        """Distance between thumb and index finger tips."""
+    def _calculate_pinch(self, lmList: List[List[float]]) -> float:
+        """
+        Calculate Euclidean distance between thumb and index finger tips.
+
+        Args:
+            lmList: List of hand landmarks
+
+        Returns:
+            Distance in pixels, or 0.0 if landmarks are invalid
+        """
         if len(lmList) < 9:
             return 0.0
-        x1, y1 = lmList[4][1], lmList[4][2]
-        x2, y2 = lmList[8][1], lmList[8][2]
+        x1, y1 = lmList[THUMB_TIP][1], lmList[THUMB_TIP][2]
+        x2, y2 = lmList[INDEX_TIP][1], lmList[INDEX_TIP][2]
         return math.hypot(x2 - x1, y2 - y1)
 
     def _calculate_openness(self, fingers: List[int]) -> float:
-        """Hand openness (0.0=fist, 1.0=fully open)."""
+        """
+        Calculate hand openness as ratio of extended fingers.
+
+        Args:
+            fingers: List of 5 binary values
+
+        Returns:
+            Float between 0.0 (fist) and 1.0 (fully open)
+        """
         return sum(fingers) / len(fingers)
 
-    def _calculate_span(self, lmList: List) -> float:
-        """Distance between thumb tip and pinky tip."""
+    def _calculate_span(self, lmList: List[List[float]]) -> float:
+        """
+        Calculate distance between thumb tip and pinky tip.
+
+        Args:
+            lmList: List of hand landmarks
+
+        Returns:
+            Distance in pixels, or 0.0 if landmarks are invalid
+        """
         if len(lmList) < 21:
             return 0.0
-        x1, y1 = lmList[4][1], lmList[4][2]
-        x2, y2 = lmList[20][1], lmList[20][2]
+        x1, y1 = lmList[THUMB_TIP][1], lmList[THUMB_TIP][2]
+        x2, y2 = lmList[PINKY_TIP][1], lmList[PINKY_TIP][2]
         return math.hypot(x2 - x1, y2 - y1)
 
-    def _calculate_palm_center(self, lmList: List) -> Dict[str, float]:
-        """Approximate palm center from wrist and middle finger base."""
+    def _calculate_palm_center(self, lmList: List[List[float]]) -> Dict[str, float]:
+        """
+        Approximate palm center from wrist and middle finger base.
+
+        Args:
+            lmList: List of hand landmarks
+
+        Returns:
+            Dictionary with 'x' and 'y' coordinates
+        """
         if len(lmList) < 10:
-            return {'x': 0, 'y': 0}
-        wrist_x, wrist_y = lmList[0][1], lmList[0][2]
-        middle_base_x, middle_base_y = lmList[9][1], lmList[9][2]
+            return {'x': 0.0, 'y': 0.0}
+        wrist_x, wrist_y = lmList[WRIST][1], lmList[WRIST][2]
+        middle_base_x, middle_base_y = lmList[MIDDLE_BASE][1], lmList[MIDDLE_BASE][2]
         return {
             'x': (wrist_x + middle_base_x) / 2,
             'y': (wrist_y + middle_base_y) / 2
         }
 
-    def _calculate_velocity(self, lmList: List) -> Optional[Dict[str, float]]:
-        """Velocity of index finger tip since last frame."""
-        if len(self.motion_history) < 1 or len(lmList) < 9:
+    def _calculate_velocity(self, lmList: List[List[float]]) -> Optional[Dict[str, float]]:
+        """
+        Calculate velocity of index finger tip since last frame.
+
+        Args:
+            lmList: List of hand landmarks
+
+        Returns:
+            Dictionary with velocity components and magnitude, or None
+        """
+        if not self.motion_history or len(lmList) < 9:
             return None
 
-        curr_x, curr_y = lmList[8][1], lmList[8][2]
+        curr_x, curr_y = lmList[INDEX_TIP][1], lmList[INDEX_TIP][2]
         prev_landmarks = self.motion_history[-1]['landmarks']
         prev_x = prev_landmarks['index_tip']['x']
         prev_y = prev_landmarks['index_tip']['y']
@@ -140,7 +235,7 @@ class MotionDescriptor:
         prev_time = self.motion_history[-1]['timestamp']
         dt = curr_time - prev_time
 
-        if dt == 0:
+        if dt <= 0:
             return None
 
         vx = (curr_x - prev_x) / dt
@@ -154,34 +249,54 @@ class MotionDescriptor:
             'direction': math.atan2(vy, vx)
         }
 
-    def _classify_primitive(self, fingers: List[int], lmList: List) -> str:
-        """Classify motion into gesture primitives."""
-        if fingers == [0, 1, 0, 0, 0]:
-            return "POINT"
-        elif fingers == [0, 1, 1, 0, 0]:
-            return "PEACE_V"
-        elif fingers == [1, 1, 1, 1, 1]:
-            return "OPEN_HAND"
-        elif sum(fingers) == 0:
-            return "FIST"
-        elif fingers == [1, 0, 0, 0, 0]:
-            return "THUMBS_UP"
-        elif fingers == [1, 1, 0, 0, 0]:
-            pinch_dist = self._calculate_pinch(lmList)
-            return "OK_SIGN" if pinch_dist < 40 else "PINCH_READY"
-        elif fingers == [0, 1, 1, 1, 0]:
-            return "THREE"
-        elif fingers == [0, 1, 1, 1, 1]:
-            return "FOUR"
-        elif fingers == [0, 0, 0, 0, 1]:
-            return "PINKY"
-        else:
-            return f"UNKNOWN_{self._encode_handshape(fingers)}"
+    def _classify_primitive(self, fingers: List[int], lmList: List[List[float]]) -> str:
+        """
+        Classify hand configuration into gesture primitive.
 
-    def _normalize_coordinates(self, descriptor: Dict, frame_shape: Tuple[int, int]) -> Dict:
-        """Normalize coordinates to [0, 1] range."""
+        Args:
+            fingers: List of 5 binary values
+            lmList: List of hand landmarks
+
+        Returns:
+            String name of the classified primitive
+        """
+        # Handle special case for FIST (all fingers down)
+        if sum(fingers) == 0:
+            return "FIST"
+
+        # Check lookup table first
+        fingers_tuple = tuple(fingers)
+        if fingers_tuple in PRIMITIVE_MAP:
+            primitive = PRIMITIVE_MAP[fingers_tuple]
+            # Special handling for PINCH_READY vs OK_SIGN
+            if primitive == "PINCH_READY":
+                pinch_dist = self._calculate_pinch(lmList)
+                return "OK_SIGN" if pinch_dist < 40 else "PINCH_READY"
+            return primitive
+
+        return f"UNKNOWN_{self._encode_handshape(fingers)}"
+
+    def _normalize_coordinates(
+        self,
+        descriptor: Dict[str, Any],
+        frame_shape: Tuple[int, int]
+    ) -> Dict[str, Dict[str, float]]:
+        """
+        Normalize coordinates to [0, 1] range.
+
+        Args:
+            descriptor: Motion descriptor with landmarks
+            frame_shape: Tuple of (height, width)
+
+        Returns:
+            Dictionary of normalized coordinates
+        """
         height, width = frame_shape
-        normalized = {}
+        if height <= 0 or width <= 0:
+            logger.warning("Invalid frame shape: %s", frame_shape)
+            return {}
+
+        normalized: Dict[str, Dict[str, float]] = {}
         for landmark_name, coords in descriptor['landmarks'].items():
             normalized[landmark_name] = {
                 'x': coords['x'] / width,
@@ -194,22 +309,53 @@ class MotionDescriptor:
         }
         return normalized
 
-    def get_motion_sequence(self, window_seconds: float = 2.0) -> List[Dict]:
-        """Returns recent motion history within time window."""
+    def get_motion_sequence(self, window_seconds: float = 2.0) -> List[Dict[str, Any]]:
+        """
+        Get recent motion history within time window.
+
+        Args:
+            window_seconds: Time window in seconds
+
+        Returns:
+            List of motion descriptors within the time window
+        """
         if not self.motion_history:
             return []
         cutoff_time = time.time() - window_seconds
         return [m for m in self.motion_history if m['timestamp'] > cutoff_time]
 
     def get_primitive_sequence(self, window_seconds: float = 2.0) -> List[str]:
-        """Returns sequence of primitives within time window."""
+        """
+        Get sequence of primitives within time window.
+
+        Args:
+            window_seconds: Time window in seconds
+
+        Returns:
+            List of primitive names
+        """
         return [m['primitive'] for m in self.get_motion_sequence(window_seconds)]
 
-    def save_sequence(self, filename: str, gesture_name: str, metadata: Optional[Dict] = None):
-        """Save motion sequence to JSON file."""
+    def save_sequence(
+        self,
+        filename: str,
+        gesture_name: str,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """
+        Save motion sequence to JSON file.
+
+        Args:
+            filename: Path to save the JSON file
+            gesture_name: Name of the gesture
+            metadata: Optional additional metadata
+
+        Returns:
+            True if saved successfully, False otherwise
+        """
         if not self.motion_history:
             logger.warning("No motion history to save")
-            return
+            return False
 
         start_time = self.motion_history[0]['timestamp']
         end_time = self.motion_history[-1]['timestamp']
@@ -233,41 +379,57 @@ class MotionDescriptor:
             with open(filename, 'w') as f:
                 json.dump(data, f, indent=2)
             logger.info("Saved %d frames to %s", len(self.motion_history), filename)
-        except Exception as e:
+            return True
+        except (IOError, OSError) as e:
             logger.error("Error saving motion data: %s", e)
+            return False
 
-    def clear_history(self):
+    def clear_history(self) -> None:
         """Clear motion history before starting new recording."""
         self.motion_history = []
         self.primitives_seen = set()
         self.recording_start_time = None
 
-    def get_statistics(self) -> Dict:
-        """Calculate statistics about recorded motion."""
+    def get_statistics(self) -> Dict[str, Any]:
+        """
+        Calculate statistics about recorded motion.
+
+        Returns:
+            Dictionary containing motion statistics
+        """
         if not self.motion_history:
             return {'error': 'No motion history'}
 
         duration = self.motion_history[-1]['timestamp'] - self.motion_history[0]['timestamp']
         fps = len(self.motion_history) / duration if duration > 0 else 0
 
-        primitives = [m['primitive'] for m in self.motion_history]
-        unique_primitives = set(primitives)
-        primitive_counts = {p: primitives.count(p) for p in unique_primitives}
+        # Count primitives efficiently using Counter
+        from collections import Counter
+        primitive_counter = Counter(m['primitive'] for m in self.motion_history)
+        primitive_counts = dict(primitive_counter)
 
-        velocities = [m['velocity']['magnitude'] for m in self.motion_history
-                      if m['velocity'] is not None]
+        # Collect velocities using list comprehension
+        velocities = [
+            m['velocity']['magnitude']
+            for m in self.motion_history
+            if m['velocity'] is not None and 'magnitude' in m['velocity']
+        ]
+
+        velocity_stats = None
+        if velocities:
+            velocity_stats = {
+                'mean': sum(velocities) / len(velocities),
+                'max': max(velocities),
+                'min': min(velocities)
+            }
 
         return {
             'duration_seconds': duration,
             'total_frames': len(self.motion_history),
             'average_fps': fps,
             'primitive_counts': primitive_counts,
-            'unique_primitives': len(unique_primitives),
-            'velocity_stats': {
-                'mean': sum(velocities) / len(velocities) if velocities else 0,
-                'max': max(velocities) if velocities else 0,
-                'min': min(velocities) if velocities else 0
-            } if velocities else None
+            'unique_primitives': len(primitive_counts),
+            'velocity_stats': velocity_stats
         }
 
 
