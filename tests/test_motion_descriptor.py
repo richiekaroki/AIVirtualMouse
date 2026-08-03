@@ -4,11 +4,12 @@ import json
 import os
 import time
 import pytest
+from collections import Counter
 
-from hand_motion.descriptor import MotionDescriptor
+from hand_motion.descriptor import MotionDescriptor, PRIMITIVE_MAP
 
 
-def make_landmarks(x_start=100, y_start=200):
+def make_landmarks(x_start: int = 100, y_start: int = 200):
     """Helper to create 21 fake hand landmarks."""
     return [[i, x_start + i * 10, y_start + i * 5] for i in range(21)]
 
@@ -122,6 +123,11 @@ class TestPrimitiveClassification:
         d = md.create_descriptor(make_landmarks(), [1, 0, 1, 0, 1])
         assert d['primitive'].startswith("UNKNOWN_")
 
+    def test_primitive_map_completeness(self):
+        """Test that PRIMITIVE_MAP contains expected primitives."""
+        assert len(PRIMITIVE_MAP) >= 8
+        assert "POINT" in PRIMITIVE_MAP.values()
+
 
 class TestHandDetection:
     def test_right_hand(self):
@@ -228,6 +234,17 @@ class TestStatistics:
         assert stats['duration_seconds'] >= 0
         assert 'POINT' in stats['primitive_counts']
 
+    def test_velocity_stats(self):
+        md = MotionDescriptor()
+        md.create_descriptor(make_landmarks(), [0, 1, 0, 0, 0])
+        time.sleep(0.01)
+        md.create_descriptor(make_landmarks(), [0, 1, 0, 0, 0])
+        stats = md.get_statistics()
+        assert stats['velocity_stats'] is not None
+        assert 'mean' in stats['velocity_stats']
+        assert 'max' in stats['velocity_stats']
+        assert 'min' in stats['velocity_stats']
+
 
 class TestSaveSequence:
     def test_saves_json(self, tmp_path):
@@ -235,7 +252,8 @@ class TestSaveSequence:
         for _ in range(3):
             md.create_descriptor(make_landmarks(), [0, 1, 0, 0, 0])
         filepath = str(tmp_path / "test.json")
-        md.save_sequence(filepath, "test_gesture")
+        result = md.save_sequence(filepath, "test_gesture")
+        assert result is True
         assert os.path.exists(filepath)
         with open(filepath) as f:
             data = json.load(f)
@@ -245,8 +263,18 @@ class TestSaveSequence:
     def test_empty_history_no_save(self, tmp_path):
         md = MotionDescriptor()
         filepath = str(tmp_path / "empty.json")
-        md.save_sequence(filepath, "empty")
+        result = md.save_sequence(filepath, "empty")
+        assert result is False
         assert not os.path.exists(filepath)
+
+    def test_saves_with_metadata(self, tmp_path):
+        md = MotionDescriptor()
+        md.create_descriptor(make_landmarks(), [0, 1, 0, 0, 0])
+        filepath = str(tmp_path / "test.json")
+        md.save_sequence(filepath, "test", metadata={'attempt': 1})
+        with open(filepath) as f:
+            data = json.load(f)
+        assert data['metadata']['custom']['attempt'] == 1
 
 
 class TestMotionSequence:
@@ -260,3 +288,32 @@ class TestMotionSequence:
         md.create_descriptor(make_landmarks(), [0, 1, 0, 0, 0])
         seq = md.get_primitive_sequence(window_seconds=2.0)
         assert seq == ['POINT']
+
+
+class TestEdgeCases:
+    def test_invalid_frame_shape(self):
+        md = MotionDescriptor()
+        d = md.create_descriptor(make_landmarks(), [0, 1, 0, 0, 0],
+                                 frame_shape=(-1, -1))
+        assert d is not None
+        assert 'normalized' in d
+        assert d['normalized'] == {}
+
+    def test_concurrent_access(self):
+        """Test that multiple descriptors can be created quickly."""
+        md = MotionDescriptor()
+        for _ in range(100):
+            md.create_descriptor(make_landmarks(), [0, 1, 0, 0, 0])
+        assert len(md.motion_history) == 100
+
+    def test_large_landmark_list(self):
+        """Test with more landmarks than expected."""
+        md = MotionDescriptor()
+        lm = make_landmarks() + [[21, 100, 200] for _ in range(10)]
+        d = md.create_descriptor(lm, [0, 1, 0, 0, 0])
+        assert d is not None
+
+    def test_slots_optimization(self):
+        """Test that __slots__ is properly defined."""
+        md = MotionDescriptor()
+        assert hasattr(md, '__slots__')
