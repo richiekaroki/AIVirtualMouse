@@ -15,7 +15,7 @@
 ┌─────────────────────────────────────────────────────────────────┐
 │                    PROCESSING LAYER                             │
 │                                                                 │
-│  HandTrackingModule.py                                          │
+│  src/hand_motion/detection.py                                  │
 │  ├── findHands()        - Detect and draw landmarks            │
 │  ├── findPosition()     - Extract landmark coordinates         │
 │  ├── fingersUp()        - Determine finger states              │
@@ -25,7 +25,7 @@
 ┌─────────────────────────────────────────────────────────────────┐
 │                   ABSTRACTION LAYER                             │
 │                                                                 │
-│  MotionDescriptor.py                                            │
+│  src/hand_motion/descriptor.py                                  │
 │  ├── create_descriptor() - Convert landmarks → structured data │
 │  │   ├── Handshape encoding                                    │
 │  │   ├── Primitive classification                              │
@@ -96,12 +96,13 @@ Action  ↓
 
 ## Module Responsibilities
 
-| Module                 | Responsibility         | Input        | Output                   |
-| ---------------------- | ---------------------- | ------------ | ------------------------ |
-| **HandTrackingModule** | Raw landmark detection | Video frames | Landmarks, finger states |
-| **MotionDescriptor**   | Data structuring       | Landmarks    | Motion descriptors       |
-| **AiVirtualMouse...**  | Application logic      | Descriptors  | UI, recording, control   |
-| **MotionAnalyzer**     | Offline analysis       | JSON files   | Plots, statistics        |
+| Module                          | Responsibility         | Input        | Output                   |
+| ------------------------------- | ---------------------- | ------------ | ------------------------ |
+| **detection.py**                | Raw landmark detection | Video frames | Landmarks, finger states |
+| **descriptor.py**               | Data structuring       | Landmarks    | Motion descriptors       |
+| **apps/cursor.py**              | Application logic      | Descriptors  | UI, recording, control   |
+| **apps/cursor_enhanced.py**     | Enhanced UI            | Descriptors  | Split-screen UI          |
+| **analyzer.py**                 | Offline analysis       | JSON files   | Plots, statistics        |
 
 ## Key Design Decisions
 

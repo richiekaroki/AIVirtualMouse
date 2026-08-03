@@ -57,7 +57,7 @@ Create a high-quality dataset of 15 gestures with 3 clean attempts each (45 tota
 - [ ] Review JSON file generated
 - [ ] Check primitive classification
 - [ ] Verify frame count (60+ for most gestures)
-- [ ] Analyze with MotionAnalyzer.py
+- [ ] Analyze with `python -m hand_motion.analyzer`
 
 ### Quality Criteria
 

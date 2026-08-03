@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hand-motion-pipeline"
+version = "0.7.0"
+description = "Real-time hand motion capture and analysis for sign language infrastructure"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Richard Kabue Karoki", email = "karokirichard522@gmail.com"},
+]
+keywords = [
+    "hand-tracking",
+    "sign-language",
+    "mediapipe",
+    "motion-capture",
+    "accessibility",
+    "computer-vision",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "cvzone>=1.6.1",
+    "mediapipe>=0.10.21",
+    "opencv-contrib-python>=4.11.0",
+    "numpy>=1.26.4",
+    "matplotlib>=3.10.0",
+    "PyAutoGUI>=0.9.54",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/richiekaroki/AIVirtualMouse"
+Repository = "https://github.com/richiekaroki/AIVirtualMouse"
+Issues = "https://github.com/richiekaroki/AIVirtualMouse/issues"
+Documentation = "https://richiekaroki.github.io/AIVirtualMouse/"
+
+[project.scripts]
+motion-analyzer = "hand_motion.analyzer:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"

@@ -58,4 +58,4 @@ This recording captures a **static point gesture** with:
 
 ---
 
-Generated using MotionAnalyzer.py\_
+Generated using `python -m hand_motion.analyzer`

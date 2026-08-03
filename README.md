@@ -153,7 +153,7 @@ pip install -r requirements.txt
 #### 1. Real-Time Capture (Enhanced UI)
 
 ```bash
-python AiVirtualMouseProject_Enhanced.py
+python -m hand_motion.apps.cursor_enhanced
 ```
 
 **Controls:**
@@ -166,16 +166,16 @@ python AiVirtualMouseProject_Enhanced.py
 #### 2. Batch Dataset Recording
 
 ```bash
-python batch_record.py
+python -m hand_motion.apps.batch_record
 ```
 
 #### 3. Motion Analysis
 
 ```bash
-python MotionAnalyzer.py motion_data/gesture.json
-python MotionAnalyzer.py motion_data/gesture.json --plot trajectory
-python MotionAnalyzer.py motion_data/gesture.json --output plots/
-python MotionAnalyzer.py gesture1.json gesture2.json --compare
+python -m hand_motion.analyzer motion_data/gesture.json
+python -m hand_motion.analyzer motion_data/gesture.json --plot trajectory
+python -m hand_motion.analyzer motion_data/gesture.json --output plots/
+python -m hand_motion.analyzer gesture1.json gesture2.json --compare
 ```
 
 ---
@@ -184,22 +184,30 @@ python MotionAnalyzer.py gesture1.json gesture2.json --compare
 
 ```
 AIVirtualMouse/
-├── MotionDescriptor.py        # Core abstraction ⭐
-├── MotionAnalyzer.py          # Analysis toolkit ⭐
-├── AiVirtualMouseProject_Enhanced.py
-├── batch_record.py
-├── analyze_dataset.py
-├── motion_data/
-│   ├── *.json
-│   └── README.md
-├── analysis_plots/
+├── src/
+│   └── hand_motion/
+│       ├── __init__.py              # Package init
+│       ├── detection.py             # Hand tracking (MediaPipe/cvzone)
+│       ├── descriptor.py            # Core abstraction ⭐
+│       ├── analyzer.py              # Analysis toolkit ⭐
+│       └── apps/
+│           ├── cursor.py            # Basic cursor control
+│           ├── cursor_enhanced.py   # Enhanced UI ⭐
+│           ├── record.py            # Single gesture recording
+│           ├── batch_record.py      # Dataset creation
+│           └── analyze_dataset.py   # Dataset analysis
+├── tests/
+│   └── test_motion_descriptor.py
 ├── docs/
-│   ├── SIGNLANGUAGE.md
-│   ├── ANALYSIS.md
-│   ├── CHANGELOG.md
-│   └── recording_plan.md
+│   ├── ARCHITECTURE.md
+│   ├── blog-post.md
+│   └── site/                        # GitHub Pages
+├── motion_data/
+│   └── *.json
+├── analysis_plots/
+├── pyproject.toml
 ├── requirements.txt
-└── dataset_summary.md
+└── README.md
 ```
 
 ---

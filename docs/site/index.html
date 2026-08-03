@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hand Motion Interpretation Pipeline | Sign Language Infrastructure</title>
+    <meta name="description" content="Real-time hand motion capture and analysis system designed as foundational infrastructure for sign language translation and accessibility technology.">
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="nav-container">
+        <a href="#" class="nav-logo">
+            <span class="logo-icon">&#9995;</span>
+            <span class="logo-text">MotionPipe</span>
+        </a>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#architecture">Architecture</a>
+            <a href="#demo">Demo</a>
+            <a href="#roadmap">Roadmap</a>
+            <a href="https://github.com/richiekaroki/AIVirtualMouse" class="nav-btn" target="_blank">GitHub</a>
+        </div>
+    </div>
+</nav>
+
+<header class="hero">
+    <div class="hero-container">
+        <div class="hero-badge">Active Development &middot; v0.6.0</div>
+        <h1 class="hero-title">
+            Hand Motion<br>
+            <span class="gradient-text">Interpretation Pipeline</span>
+        </h1>
+        <p class="hero-subtitle">
+            Real-time motion capture and analysis system built as foundational
+            infrastructure for sign language translation and accessibility technology.
+            Treats hand gestures as <strong>structured linguistic data</strong>, not just visual input.
+        </p>
+        <div class="hero-actions">
+            <a href="https://github.com/richiekaroki/AIVirtualMouse#quick-start" class="btn btn-primary" target="_blank">Get Started</a>
+            <a href="#architecture" class="btn btn-secondary">View Architecture</a>
+        </div>
+        <div class="hero-stats">
+            <div class="stat">
+                <span class="stat-value">21</span>
+                <span class="stat-label">Hand Landmarks</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value">30</span>
+                <span class="stat-label">FPS Capture</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value">45</span>
+                <span class="stat-label">Recordings</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value">4</span>
+                <span class="stat-label">Output Targets</span>
+            </div>
+        </div>
+    </div>
+</header>
+
+<section id="features" class="section">
+    <div class="container">
+        <h2 class="section-title">Key Features</h2>
+        <p class="section-subtitle">From raw webcam input to structured motion data in real-time</p>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">&#127909;</div>
+                <h3>Real-Time Motion Capture</h3>
+                <p>21-point hand tracking at 30 FPS using MediaPipe. Coordinate normalization for cross-device consistency.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#129504;</div>
+                <h3>Motion Descriptor Abstraction</h3>
+                <p>Converts raw landmarks into structured data: handshape, location, velocity, and gesture primitives.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#128190;</div>
+                <h3>JSON Data Pipeline</h3>
+                <p>Export motion sequences with metadata, timestamps, and quality metrics for ML training and analysis.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#128200;</div>
+                <h3>Analysis &amp; Visualization</h3>
+                <p>Trajectory plots, primitive timelines, velocity profiles, and gesture comparison tools.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#127912;</div>
+                <h3>Professional UI</h3>
+                <p>Split-screen interface with live skeleton overlay, recording controls, and session statistics.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#128256;</div>
+                <h3>Cursor Control</h3>
+                <p>Gesture-based mouse control: index finger moves cursor, pinch gestures click. Accessibility first.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="architecture" class="section section-dark">
+    <div class="container">
+        <h2 class="section-title">Architecture</h2>
+        <p class="section-subtitle">Motion capture decoupled from output actions &mdash; same data drives everything</p>
+
+        <div class="architecture-diagram">
+            <div class="arch-layer">
+                <div class="arch-box arch-input">
+                    <div class="arch-label">Input Layer</div>
+                    <div class="arch-detail">Camera &rarr; OpenCV &rarr; MediaPipe Hands</div>
+                    <div class="arch-tag">21 landmarks @ 30 FPS</div>
+                </div>
+            </div>
+            <div class="arch-arrow">&darr;</div>
+            <div class="arch-layer">
+                <div class="arch-box arch-processing">
+                    <div class="arch-label">HandTrackingModule</div>
+                    <div class="arch-detail">cvzone wrapper &bull; Landmark extraction &bull; Finger detection</div>
+                </div>
+            </div>
+            <div class="arch-arrow">&darr;</div>
+            <div class="arch-layer">
+                <div class="arch-box arch-core">
+                    <div class="arch-label">MotionDescriptor</div>
+                    <div class="arch-detail">Structured motion data &bull; Primitive classification &bull; Velocity tracking</div>
+                    <div class="arch-tag">Core abstraction layer</div>
+                </div>
+            </div>
+            <div class="arch-arrow">&darr;</div>
+            <div class="arch-outputs">
+                <div class="arch-box arch-output">
+                    <div class="arch-label">Cursor Control</div>
+                    <div class="arch-detail">PyAutoGUI</div>
+                </div>
+                <div class="arch-box arch-output">
+                    <div class="arch-label">JSON Export</div>
+                    <div class="arch-detail">Training data</div>
+                </div>
+                <div class="arch-box arch-output">
+                    <div class="arch-label">Visualization</div>
+                    <div class="arch-detail">Matplotlib plots</div>
+                </div>
+                <div class="arch-box arch-output">
+                    <div class="arch-label">Animation</div>
+                    <div class="arch-detail">Future: 3D rigs</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="demo" class="section">
+    <div class="container">
+        <h2 class="section-title">How It Works</h2>
+        <p class="section-subtitle">Watch the pipeline in action</p>
+
+        <div class="demo-grid">
+            <div class="demo-card">
+                <div class="demo-step">1</div>
+                <h3>Capture</h3>
+                <p>Webcam feed is processed by MediaPipe to extract 21 hand landmarks in real-time. The enhanced UI shows a live skeleton overlay.</p>
+                <div class="demo-code">
+                    <code>python -m hand_motion.apps.cursor_enhanced</code>
+                </div>
+            </div>
+            <div class="demo-card">
+                <div class="demo-step">2</div>
+                <h3>Analyze</h3>
+                <p>MotionDescriptor converts landmarks into structured data: handshape codes, gesture primitives, velocity vectors, and normalized coordinates.</p>
+                <div class="demo-code">
+                    <code>primitive: POINT &middot; openness: 0.20 &middot; vel: 45.2 px/s</code>
+                </div>
+            </div>
+            <div class="demo-card">
+                <div class="demo-step">3</div>
+                <h3>Record</h3>
+                <p>Press R to start recording. Motion sequences are captured with timestamps and exported as structured JSON files.</p>
+                <div class="demo-code">
+                    <code>gesture_wave_1735814400.json &middot; 75 frames &middot; 2.5s</code>
+                </div>
+            </div>
+            <div class="demo-card">
+                <div class="demo-step">4</div>
+                <h3>Analyze Offline</h3>
+                <p>Use MotionAnalyzer to generate trajectory plots, velocity profiles, and primitive timelines from recorded data.</p>
+                <div class="demo-code">
+                    <code>python -m hand_motion.analyzer gesture.json --plot all</code>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="screenshots" class="section section-dark">
+    <div class="container">
+        <h2 class="section-title">See It In Action</h2>
+        <p class="section-subtitle">Real-time hand tracking, motion analysis, and gesture recording</p>
+
+        <div class="screenshots-grid">
+            <div class="screenshot-card">
+                <div class="screenshot-placeholder" id="gif-enhanced">
+                    <div class="placeholder-icon">&#127909;</div>
+                    <div class="placeholder-text">Enhanced UI Demo</div>
+                    <div class="placeholder-hint">Split-screen with skeleton overlay, primitives, and recording</div>
+                    <code class="placeholder-filename">assets/demo-enhanced-ui.gif</code>
+                </div>
+                <div class="screenshot-caption">
+                    <h3>Enhanced UI</h3>
+                    <p>Live hand tracking with split-screen analytics panel, primitive timeline, and session stats.</p>
+                </div>
+            </div>
+
+            <div class="screenshot-card">
+                <div class="screenshot-placeholder" id="gif-recording">
+                    <div class="placeholder-icon">&#127909;</div>
+                    <div class="placeholder-text">Recording Demo</div>
+                    <div class="placeholder-hint">Press R to record, S to save. Shows timer and frame counter.</div>
+                    <code class="placeholder-filename">assets/demo-recording.gif</code>
+                </div>
+                <div class="screenshot-caption">
+                    <h3>Gesture Recording</h3>
+                    <p>Capture motion sequences with real-time feedback. Export structured JSON with metadata.</p>
+                </div>
+            </div>
+
+            <div class="screenshot-card">
+                <div class="screenshot-placeholder" id="gif-analysis">
+                    <div class="placeholder-icon">&#128200;</div>
+                    <div class="placeholder-text">Analysis Plots</div>
+                    <div class="placeholder-hint">Trajectory, velocity, primitive timeline, and distribution plots</div>
+                    <code class="placeholder-filename">assets/demo-analysis.gif</code>
+                </div>
+                <div class="screenshot-caption">
+                    <h3>Motion Analysis</h3>
+                    <p>Offline visualization: trajectory paths, velocity profiles, and primitive distributions.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="screenshots-note">
+            <p>Demo GIFs coming soon. Want to contribute? <a href="https://github.com/richiekaroki/AIVirtualMouse#contributing" target="_blank">Record a screen capture</a> and open a PR!</p>
+        </div>
+    </div>
+</section>
+
+<section id="sign-language" class="section">
+    <div class="container">
+        <h2 class="section-title">Why This Matters</h2>
+        <p class="section-subtitle">Building infrastructure for sign language translation</p>
+
+        <div class="sign-grid">
+            <div class="sign-card">
+                <div class="sign-param">Handshape</div>
+                <div class="sign-status status-done">Captured</div>
+                <p>Finger states, landmark relationships, handshape encoding (e.g., "11000" for POINT)</p>
+            </div>
+            <div class="sign-card">
+                <div class="sign-param">Location</div>
+                <div class="sign-status status-done">Captured</div>
+                <p>Normalized 2D coordinates, palm center tracking, spatial relationships</p>
+            </div>
+            <div class="sign-card">
+                <div class="sign-param">Movement</div>
+                <div class="sign-status status-done">Captured</div>
+                <p>Velocity vectors, trajectory analysis, temporal primitive sequences</p>
+            </div>
+            <div class="sign-card">
+                <div class="sign-param">Orientation</div>
+                <div class="sign-status status-partial">Partial</div>
+                <p>Landmark directions. Planned: 3D orientation from depth data</p>
+            </div>
+        </div>
+
+        <div class="future-notes">
+            <h3>Planned Extensions</h3>
+            <ul>
+                <li>Facial expressions (non-manual markers) via MediaPipe Face Mesh</li>
+                <li>Body position context via MediaPipe Pose</li>
+                <li>Two-handed coordination for complex signs</li>
+                <li>Gloss annotation and co-articulation modeling</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<section id="roadmap" class="section">
+    <div class="container">
+        <h2 class="section-title">Roadmap</h2>
+        <p class="section-subtitle">From motion capture to full translation pipeline</p>
+
+        <div class="timeline">
+            <div class="timeline-item timeline-done">
+                <div class="timeline-marker"></div>
+                <div class="timeline-content">
+                    <div class="timeline-phase">Phase 0 &mdash; Foundation</div>
+                    <h3>Core Pipeline</h3>
+                    <ul>
+                        <li>MediaPipe hand tracking integration</li>
+                        <li>MotionDescriptor abstraction layer</li>
+                        <li>JSON export and analysis tools</li>
+                        <li>Real-time cursor control</li>
+                        <li>Dataset recording tools</li>
+                    </ul>
+                    <span class="timeline-status">Completed</span>
+                </div>
+            </div>
+            <div class="timeline-item timeline-current">
+                <div class="timeline-marker"></div>
+                <div class="timeline-content">
+                    <div class="timeline-phase">Phase 1 &mdash; Extended Capture</div>
+                    <h3>Multi-Modal Motion</h3>
+                    <ul>
+                        <li>MediaPipe Pose (body tracking)</li>
+                        <li>MediaPipe Face Mesh (expressions)</li>
+                        <li>Two-handed coordination</li>
+                        <li>3D orientation extraction</li>
+                    </ul>
+                    <span class="timeline-status">In Progress</span>
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-marker"></div>
+                <div class="timeline-content">
+                    <div class="timeline-phase">Phase 2 &mdash; Linguistic Layer</div>
+                    <h3>Sign Language Semantics</h3>
+                    <ul>
+                        <li>Gloss annotation tools</li>
+                        <li>Co-articulation modeling</li>
+                        <li>Deaf community validation framework</li>
+                    </ul>
+                    <span class="timeline-status">Planned</span>
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-marker"></div>
+                <div class="timeline-content">
+                    <div class="timeline-phase">Phase 3 &mdash; Animation</div>
+                    <h3>3D Output</h3>
+                    <ul>
+                        <li>Blender / Three.js rig integration</li>
+                        <li>Motion retargeting</li>
+                        <li>Keyframe generation</li>
+                    </ul>
+                    <span class="timeline-status">Planned</span>
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-marker"></div>
+                <div class="timeline-content">
+                    <div class="timeline-phase">Phase 4 &mdash; Translation</div>
+                    <h3>Full Pipeline</h3>
+                    <ul>
+                        <li>Text &rarr; gloss (NLP)</li>
+                        <li>Gloss &rarr; motion synthesis</li>
+                        <li>Real-time deployment</li>
+                    </ul>
+                    <span class="timeline-status">Planned</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section cta-section">
+    <div class="container">
+        <div class="cta-card">
+            <h2>Built for Accessibility &amp; Linguistic Preservation</h2>
+            <p>Open source, contributions welcome &mdash; especially from the deaf community, sign language researchers, and accessibility technologists.</p>
+            <div class="cta-actions">
+                <a href="https://github.com/richiekaroki/AIVirtualMouse" class="btn btn-primary" target="_blank">View on GitHub</a>
+                <a href="https://github.com/richiekaroki/AIVirtualMouse#contributing" class="btn btn-secondary" target="_blank">Contribute</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<footer class="footer">
+    <div class="container">
+        <div class="footer-content">
+            <div class="footer-info">
+                <span class="footer-logo">&#9995; MotionPipe</span>
+                <p>Hand Motion Interpretation Pipeline<br>Sign language infrastructure research</p>
+            </div>
+            <div class="footer-links">
+                <a href="https://github.com/richiekaroki/AIVirtualMouse" target="_blank">GitHub</a>
+                <a href="https://github.com/richiekaroki" target="_blank">Author</a>
+                <a href="https://linkedin.com/in/richard-karoki-007" target="_blank">LinkedIn</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Richard Kabue Karoki &middot; Nairobi, Kenya &middot; MIT License</p>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>

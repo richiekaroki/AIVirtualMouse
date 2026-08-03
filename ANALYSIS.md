@@ -1,6 +1,6 @@
 # Motion Analysis Guide
 
-This guide explains how to analyze recorded gesture sequences using the `MotionAnalyzer.py` tool.
+This guide explains how to analyze recorded gesture sequences using the `hand_motion.analyzer` module.
 
 ## Overview
 
@@ -18,7 +18,7 @@ The Motion Analyzer provides comprehensive offline analysis of recorded gestures
 ### Analyze a Single Gesture
 
 ```bash
-python MotionAnalyzer.py motion_data/your_gesture.json
+python -m hand_motion.analyzer motion_data/your_gesture.json
 ```
 
 This will:
@@ -31,26 +31,26 @@ This will:
 
 ```bash
 # Trajectory only
-python MotionAnalyzer.py motion_data/gesture.json --plot trajectory
+python -m hand_motion.analyzer motion_data/gesture.json --plot trajectory
 
 # Primitives only
-python MotionAnalyzer.py motion_data/gesture.json --plot primitives
+python -m hand_motion.analyzer motion_data/gesture.json --plot primitives
 
 # Velocity only
-python MotionAnalyzer.py motion_data/gesture.json --plot velocity
+python -m hand_motion.analyzer motion_data/gesture.json --plot velocity
 
 # Hand openness only
-python MotionAnalyzer.py motion_data/gesture.json --plot openness
+python -m hand_motion.analyzer motion_data/gesture.json --plot openness
 
 # Distribution only
-python MotionAnalyzer.py motion_data/gesture.json --plot distribution
+python -m hand_motion.analyzer motion_data/gesture.json --plot distribution
 ```
 
 ### Save Plots to Files
 
 ```bash
 # Save all plots to directory
-python MotionAnalyzer.py motion_data/gesture.json --output analysis_plots/
+python -m hand_motion.analyzer motion_data/gesture.json --output analysis_plots/
 
 # This creates:
 #   analysis_plots/gesture_trajectory.png
@@ -63,7 +63,7 @@ python MotionAnalyzer.py motion_data/gesture.json --output analysis_plots/
 ### Compare Two Gestures
 
 ```bash
-python MotionAnalyzer.py gesture1.json gesture2.json --compare
+python -m hand_motion.analyzer gesture1.json gesture2.json --compare
 ```
 
 Useful for:

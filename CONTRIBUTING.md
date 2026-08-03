@@ -33,7 +33,7 @@ Thank you for your interest in contributing! This project aims to build foundati
 
 **Code Style:**
 
-- Python 3.8+ compatible
+- Python 3.11+ compatible
 - Follow PEP 8 guidelines
 - Use descriptive variable names
 - Add comments for complex logic
@@ -110,13 +110,14 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
-```
-
 pip install -r requirements.txt
-Run tests
-python test_motion_descriptor.py
-Try the system
-python AiVirtualMouseProject_Enhanced.py
+
+# Run tests
+python -m pytest tests/ -v
+
+# Try the system
+python -m hand_motion.apps.cursor_enhanced
+```
 
 ## Questions?
 
