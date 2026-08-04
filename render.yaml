@@ -4,6 +4,12 @@ services:
     runtime: docker
     dockerfilePath: Dockerfile
     envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FLASK_ENV
+        value: "production"
+      - key: ALLOWED_ORIGINS
+        value: "https://hand-motion-pipeline.onrender.com"
       - key: TF_CPP_MIN_LOG_LEVEL
         value: "3"
       - key: PYTHONUNBUFFERED

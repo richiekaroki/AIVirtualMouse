@@ -20,13 +20,38 @@ import contextlib
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, make_response
 from flask_socketio import SocketIO, emit
 import logging
 
 logger = logging.getLogger(__name__)
 
-socketio = SocketIO(cors_allowed_origins="*", async_mode="threading")
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "https://hand-motion-pipeline.onrender.com")
+socketio = SocketIO(cors_allowed_origins=ALLOWED_ORIGINS, async_mode="threading")
+
+
+def _safe_filename(filename: str, data_dir: Path) -> Path | None:
+    """Sanitize a filename and return resolved path if valid, None otherwise."""
+    if not filename:
+        return None
+    name = Path(filename).name
+    if ".." in name or "/" in name or "\\" in name:
+        return None
+    if not name.endswith(".json"):
+        return None
+    resolved = (data_dir / name).resolve()
+    if not str(resolved).startswith(str(data_dir.resolve())):
+        return None
+    return resolved
+
+
+def _security_headers(response):
+    """Add security headers to every response."""
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 
 def create_app(
@@ -51,7 +76,15 @@ def create_app(
     )
     app.config["DATA_DIR"] = Path(data_dir)
     app.config["DATA_DIR"].mkdir(parents=True, exist_ok=True)
-    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "hand-motion-dev-key")
+
+    secret_key = os.environ.get("SECRET_KEY")
+    if not secret_key:
+        if os.environ.get("FLASK_ENV") == "production":
+            raise RuntimeError("SECRET_KEY environment variable is required in production")
+        secret_key = "hand-motion-dev-key"
+    app.config["SECRET_KEY"] = secret_key
+
+    app.after_request(_security_headers)
 
     socketio.init_app(app)
 
@@ -66,13 +99,42 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/")
     def index():
-        return render_template("index.html")
+        from flask import request
+        base_url = request.host_url.rstrip("/")
+        return render_template("index.html", base_url=base_url)
+
+    @app.route("/robots.txt")
+    def robots_txt():
+        from flask import Response, request
+        base = request.host_url.rstrip("/")
+        content = f"User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: {base}/sitemap.xml\n"
+        return Response(content, mimetype="text/plain")
+
+    @app.route("/sitemap.xml")
+    def sitemap_xml():
+        from flask import Response, request
+        base = request.host_url.rstrip("/")
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>{base}/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>{base}/api/health</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.3</priority>
+  </url>
+</urlset>"""
+        return Response(xml, mimetype="application/xml")
 
     @app.route("/api/health")
     def health():
+        from hand_motion import __version__
         return jsonify({
             "status": "healthy",
-            "version": "0.8.0",
+            "version": __version__,
             "name": "Hand Motion Interpretation Pipeline",
             "websocket": True,
         })
@@ -101,20 +163,20 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/api/recording/<filename>")
     def get_recording(filename: str):
-        filepath = app.config["DATA_DIR"] / filename
-        if not filepath.exists():
+        filepath = _safe_filename(filename, app.config["DATA_DIR"])
+        if filepath is None or not filepath.exists():
             return jsonify({"error": "Recording not found"}), 404
         try:
             with open(filepath, "r") as f:
                 data = json.load(f)
             return jsonify(data)
         except Exception as e:
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "Failed to read recording"}), 500
 
     @app.route("/api/analyze/<filename>")
     def analyze_recording(filename: str):
-        filepath = app.config["DATA_DIR"] / filename
-        if not filepath.exists():
+        filepath = _safe_filename(filename, app.config["DATA_DIR"])
+        if filepath is None or not filepath.exists():
             return jsonify({"error": "Recording not found"}), 404
         try:
             from hand_motion.analyzer import MotionAnalyzer
@@ -128,12 +190,12 @@ def register_routes(app: Flask) -> None:
                 "primitives": stats.get("primitives_used", []),
             })
         except Exception as e:
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "Failed to analyze recording"}), 500
 
     @app.route("/api/validate/<filename>")
     def validate_recording(filename: str):
-        filepath = app.config["DATA_DIR"] / filename
-        if not filepath.exists():
+        filepath = _safe_filename(filename, app.config["DATA_DIR"])
+        if filepath is None or not filepath.exists():
             return jsonify({"error": "Recording not found"}), 404
         try:
             from hand_motion.validation import validate_motion_file
@@ -147,7 +209,7 @@ def register_routes(app: Flask) -> None:
                 ],
             })
         except Exception as e:
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "Failed to validate recording"}), 500
 
     @app.route("/api/stats")
     def get_stats():
@@ -306,7 +368,7 @@ def register_socket_handlers(app: Flask) -> None:
 
         except Exception as e:
             logger.error("Frame processing error: %s", e)
-            emit("frame_result", {"error": str(e)})
+            emit("frame_result", {"error": "Frame processing failed"})
 
     @socketio.on("start_camera")
     def handle_start_camera(data):
@@ -419,9 +481,8 @@ def register_socket_handlers(app: Flask) -> None:
             emit("playback_error", {"error": "No filename provided"})
             return
 
-        data_dir = app.config["DATA_DIR"]
-        filepath = data_dir / filename
-        if not filepath.exists():
+        filepath = _safe_filename(filename, app.config["DATA_DIR"])
+        if filepath is None or not filepath.exists():
             emit("playback_error", {"error": "File not found"})
             return
 
