@@ -19,7 +19,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgles2-mesa libegl1-mesa
+          sudo apt-get install -y libgles2 libegl1
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
