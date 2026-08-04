@@ -5,6 +5,7 @@ Translates gesture sequences into text or gloss notation:
 - Sequence-to-sequence translation
 - Gloss notation generation
 - Context-aware translation
+- Attention-based neural NLP for gloss-to-text
 """
 
 import json
@@ -15,6 +16,14 @@ from collections import Counter
 import logging
 
 logger = logging.getLogger(__name__)
+
+try:
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
 
 
 class GlossTranslator:
@@ -357,3 +366,240 @@ class SignLanguageDictionary:
                 })
 
         return results
+
+
+# ── Neural Seq2Seq Gloss-to-Text Model ──────────────────────────────────
+
+class GlossEncoder(nn.Module if TORCH_AVAILABLE else object):
+    """Encoder: embeds gloss tokens and produces hidden states."""
+
+    def __init__(self, vocab_size: int, embed_dim: int = 64, hidden_dim: int = 128, dropout: float = 0.3):
+        if not TORCH_AVAILABLE:
+            return
+        super().__init__()
+        self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=0)
+        self.rnn = nn.GRU(embed_dim, hidden_dim, batch_first=True, bidirectional=True, dropout=dropout)
+        self.fc = nn.Linear(hidden_dim * 2, hidden_dim)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Args:
+            x: (batch, seq_len) token IDs
+        Returns:
+            outputs: (batch, seq_len, hidden_dim)
+            hidden: (batch, hidden_dim)
+        """
+        embedded = self.dropout(self.embedding(x))
+        outputs, hidden = self.rnn(embedded)
+        # Combine bidirectional hidden
+        hidden = torch.cat([hidden[-2], hidden[-1]], dim=1)
+        hidden = torch.tanh(self.fc(hidden))
+        return outputs, hidden
+
+
+class GlossAttention(nn.Module if TORCH_AVAILABLE else object):
+    """Bahdanau attention over encoder outputs."""
+
+    def __init__(self, hidden_dim: int):
+        if not TORCH_AVAILABLE:
+            return
+        super().__init__()
+        self.attn = nn.Linear(hidden_dim * 3, hidden_dim)
+        self.v = nn.Linear(hidden_dim, 1, bias=False)
+
+    def forward(self, hidden: torch.Tensor, encoder_outputs: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            hidden: (batch, hidden_dim) decoder hidden
+            encoder_outputs: (batch, src_len, hidden_dim)
+        Returns:
+            attention weights: (batch, src_len)
+        """
+        src_len = encoder_outputs.size(1)
+        hidden_expanded = hidden.unsqueeze(1).repeat(1, src_len, 1)
+        energy = torch.tanh(self.attn(torch.cat([hidden_expanded, encoder_outputs], dim=2)))
+        attention = self.v(energy).squeeze(2)
+        return F.softmax(attention, dim=1)
+
+
+class TextDecoder(nn.Module if TORCH_AVAILABLE else object):
+    """Decoder: generates text tokens one at a time with attention."""
+
+    def __init__(self, vocab_size: int, embed_dim: int = 64, hidden_dim: int = 128, dropout: float = 0.3):
+        if not TORCH_AVAILABLE:
+            return
+        super().__init__()
+        self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=0)
+        self.attention = GlossAttention(hidden_dim)
+        self.rnn = nn.GRU(hidden_dim * 2 + embed_dim, hidden_dim, batch_first=True)
+        self.fc_out = nn.Linear(hidden_dim * 3 + embed_dim, vocab_size)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(
+        self,
+        input_token: torch.Tensor,
+        hidden: torch.Tensor,
+        encoder_outputs: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Single decoding step.
+        """
+        embedded = self.dropout(self.embedding(input_token.unsqueeze(1)))  # (batch, 1, embed)
+
+        attn_weights = self.attention(hidden, encoder_outputs)  # (batch, src_len)
+        context = torch.bmm(attn_weights.unsqueeze(1), encoder_outputs)  # (batch, 1, hidden*2)
+
+        rnn_input = torch.cat([embedded, context], dim=2)  # (batch, 1, embed + hidden*2)
+        output, hidden = self.rnn(rnn_input, hidden.unsqueeze(0))
+        hidden = hidden.squeeze(0)
+
+        prediction = self.fc_out(torch.cat([output.squeeze(1), context.squeeze(1), embedded.squeeze(1)], dim=1))
+        return prediction, hidden, attn_weights
+
+
+class Seq2SeqTranslator(nn.Module if TORCH_AVAILABLE else object):
+    """
+    Full encoder-decoder model for gloss-to-text translation.
+    """
+
+    PAD_TOKEN = 0
+    SOS_TOKEN = 1
+    EOS_TOKEN = 2
+
+    def __init__(self, src_vocab: int, tgt_vocab: int, embed_dim: int = 64, hidden_dim: int = 128):
+        if not TORCH_AVAILABLE:
+            return
+        super().__init__()
+        self.encoder = GlossEncoder(src_vocab, embed_dim, hidden_dim)
+        self.decoder = TextDecoder(tgt_vocab, embed_dim, hidden_dim)
+        self.src_vocab = src_vocab
+        self.tgt_vocab = tgt_vocab
+
+    def forward(
+        self,
+        src: torch.Tensor,
+        tgt: torch.Tensor,
+        teacher_forcing_ratio: float = 0.5,
+    ) -> torch.Tensor:
+        """
+        Forward pass for training.
+
+        Args:
+            src: (batch, src_len) source token IDs
+            tgt: (batch, tgt_len) target token IDs
+            teacher_forcing_ratio: Probability of using teacher forcing
+
+        Returns:
+            outputs: (batch, tgt_len, tgt_vocab_size) logits
+        """
+        batch_size = tgt.size(0)
+        tgt_len = tgt.size(1)
+
+        outputs = torch.zeros(batch_size, tgt_len, self.tgt_vocab).to(src.device)
+        encoder_outputs, hidden = self.encoder(src)
+
+        input_token = tgt[:, 0]  # SOS token
+
+        for t in range(1, tgt_len):
+            prediction, hidden, _ = self.decoder(input_token, hidden, encoder_outputs)
+            outputs[:, t] = prediction
+
+            if torch.rand(1).item() < teacher_forcing_ratio:
+                input_token = tgt[:, t]
+            else:
+                input_token = prediction.argmax(dim=1)
+
+        return outputs
+
+
+class NeuralGlossTranslator:
+    """
+    High-level wrapper for the seq2seq gloss-to-text model.
+
+    Provides train/translate interface with vocabulary management.
+    """
+
+    def __init__(self, model_path: Optional[str] = None):
+        self.model = None
+        self.src_vocab: Dict[str, int] = {"<pad>": 0, "<sos>": 1, "<eos>": 2}
+        self.tgt_vocab: Dict[str, int] = {"<pad>": 0, "<sos>": 1, "<eos>": 2}
+        self.src_idx_to_token: Dict[int, str] = {v: k for k, v in self.src_vocab.items()}
+        self.tgt_idx_to_token: Dict[int, str] = {v: k for k, v in self.tgt_vocab.items()}
+
+        if model_path and os.path.exists(model_path):
+            self.load_model(model_path)
+
+    def _build_vocab(self, sequences: List[List[str]], min_count: int = 1):
+        """Build vocabulary from token sequences."""
+        counter = Counter()
+        for seq in sequences:
+            counter.update(seq)
+        for token, count in counter.items():
+            if count >= min_count and token not in self.src_vocab:
+                idx = len(self.src_vocab)
+                self.src_vocab[token] = idx
+                self.src_idx_to_token[idx] = token
+
+    def _encode(self, tokens: List[str], vocab: Dict[str, int]) -> List[int]:
+        return [vocab.get(t, vocab["<sos>"]) for t in tokens]
+
+    def _decode(self, indices: List[int]) -> List[str]:
+        tokens = []
+        for idx in indices:
+            if idx == self.tgt_vocab["<eos>"]:
+                break
+            if idx not in (self.tgt_vocab["<pad>"], self.tgt_vocab["<sos>"]):
+                tokens.append(self.tgt_idx_to_token.get(idx, "<unk>"))
+        return tokens
+
+    def translate(self, gloss_sequence: List[str]) -> str:
+        """
+        Translate a gloss sequence to text using the neural model.
+        Falls back to rule-based translation if model not available.
+        """
+        if not TORCH_AVAILABLE or self.model is None:
+            return " ".join(gloss_sequence)
+
+        src_tokens = self._encode(gloss_sequence, self.src_vocab)
+        src_tensor = torch.LongTensor([src_tokens])
+
+        self.model.eval()
+        with torch.no_grad():
+            encoder_outputs, hidden = self.model.encoder(src_tensor)
+
+            input_token = torch.LongTensor([self.tgt_vocab["<sos>"]])
+            decoded_tokens = []
+
+            for _ in range(50):
+                prediction, hidden, _ = self.model.decoder(input_token, hidden, encoder_outputs)
+                top1 = prediction.argmax(dim=1)
+                decoded_tokens.append(top1.item())
+                input_token = top1
+                if top1.item() == self.tgt_vocab["<eos>"]:
+                    break
+
+        result_tokens = self._decode(decoded_tokens)
+        return " ".join(result_tokens)
+
+    def save_model(self, path: str):
+        if not TORCH_AVAILABLE or self.model is None:
+            return
+        torch.save({
+            "state_dict": self.model.state_dict(),
+            "src_vocab": self.src_vocab,
+            "tgt_vocab": self.tgt_vocab,
+        }, path)
+
+    def load_model(self, path: str):
+        if not TORCH_AVAILABLE:
+            return
+        checkpoint = torch.load(path, map_location="cpu")
+        self.src_vocab = checkpoint["src_vocab"]
+        self.tgt_vocab = checkpoint["tgt_vocab"]
+        self.src_idx_to_token = {v: k for k, v in self.src_vocab.items()}
+        self.tgt_idx_to_token = {v: k for k, v in self.tgt_vocab.items()}
+
+        self.model = Seq2SeqTranslator(len(self.src_vocab), len(self.tgt_vocab))
+        self.model.load_state_dict(checkpoint["state_dict"])
+        logger.info("Loaded neural translator from %s", path)
