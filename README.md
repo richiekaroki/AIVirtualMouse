@@ -3,7 +3,7 @@
 ### From Gesture Recognition to Sign Language Infrastructure
 
 [![Status](https://img.shields.io/badge/status-active-success.svg)]()
-[![Python](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-142%20passing-brightgreen.svg)]()
 [![Focus](https://img.shields.io/badge/focus-accessibility%20tech-purple.svg)]()
@@ -112,7 +112,7 @@ This project is built on four principles:
 
 ### Python Version
 
-**Python 3.13+ required** (MediaPipe 0.10.35+ supports 3.13)
+**Python 3.11+ required**
 
 ### Installation
 
@@ -122,13 +122,14 @@ cd AIVirtualMouse
 python -m venv venv
 venv\Scripts\activate   # Windows
 pip install -r requirements.txt
+pip install -e .
 ```
 
 ### Run Locally
 
 ```bash
 # Start the web server
-python -m src.hand_motion.web.app
+python wsgi.py
 
 # Open in browser
 # http://localhost:8000
@@ -147,7 +148,7 @@ Live at: `https://hand-motion-pipeline.onrender.com`
 ### 1. Browser Webcam (Recommended)
 
 ```bash
-python -m src.hand_motion.web.app
+python wsgi.py
 # Open http://localhost:8000
 # Click Start to activate camera
 # Allow camera access when prompted
@@ -174,9 +175,9 @@ python -m hand_motion.apps.batch_record
 ### 4. Motion Analysis
 
 ```bash
-python -m hand_motion.analyzer motion_data/gesture.json
-python -m hand_motion.analyzer motion_data/gesture.json --plot trajectory
-python -m hand_motion.analyzer gesture1.json gesture2.json --compare
+python -m hand_motion.analyzer motion_data/circle_sample.json
+python -m hand_motion.analyzer motion_data/circle_sample.json --plot trajectory
+python -m hand_motion.analyzer motion_data/circle_sample.json motion_data/fist_sample.json --compare
 ```
 
 ### 5. Run Tests
@@ -197,30 +198,50 @@ AIVirtualMouse/
 │   ├── detection.py              # Hand tracking (MediaPipe/cvzone)
 │   ├── descriptor.py             # Core abstraction (32 primitives)
 │   ├── analyzer.py               # Analysis toolkit
+│   ├── animation.py              # 3D animation export
+│   ├── batch.py                  # Batch processing
+│   ├── database.py               # SQLite storage
+│   ├── export.py                 # Multi-format export
+│   ├── face.py                   # Face mesh (MediaPipe)
+│   ├── gloss.py                  # Gloss annotation
+│   ├── gpu.py                    # GPU acceleration
+│   ├── pose.py                   # Body tracking (MediaPipe Pose)
+│   ├── validation.py             # Dataset quality checks
+│   ├── video_export.py           # Video export
 │   ├── ai/
+│   │   ├── __init__.py
 │   │   ├── landmark_classifier.py    # ML classifier (RandomForest)
 │   │   ├── gesture_recognizer.py     # CNN+LSTM architecture
-│   │   └── inference_engine.py       # Frame buffering + sliding window
+│   │   ├── inference_engine.py       # Frame buffering + sliding window
+│   │   └── translator.py             # Gesture translation
 │   ├── web/
-│   │   ├── app.py                # Flask + SocketIO server
-│   │   ├── __main__.py           # Entry point
-│   │   └── templates/index.html  # Web UI
+│   │   ├── __init__.py
+│   │   ├── __main__.py               # Entry point
+│   │   ├── app.py                    # Flask + SocketIO server
+│   │   ├── static/                   # Static assets
+│   │   └── templates/index.html      # Web UI
 │   └── apps/
-│       ├── cursor.py
-│       ├── cursor_enhanced.py
-│       ├── record.py
-│       ├── batch_record.py
-│       └── analyze_dataset.py
+│       ├── __init__.py
+│       ├── cursor.py                 # Basic cursor control
+│       ├── cursor_enhanced.py        # Enhanced UI version
+│       ├── record.py                 # Single gesture recording
+│       ├── batch_record.py           # Dataset creation
+│       └── analyze_dataset.py        # Dataset analysis
 ├── models/
 │   └── landmark_classifier.pkl   # Trained ML model
 ├── motion_data/
 │   └── *.json                    # 15 sample recordings
 ├── tests/
 │   └── test_*.py                 # 142 tests
+├── examples/                     # Usage examples
+├── docs/                         # Documentation
+├── scripts/                      # Utility scripts
 ├── Dockerfile                    # Render deployment
 ├── render.yaml                   # Render blueprint
 ├── requirements.txt              # Core + web dependencies
+├── pyproject.toml                # Package config
 ├── wsgi.py                       # Gunicorn entry point
+├── LICENSE
 └── README.md
 ```
 

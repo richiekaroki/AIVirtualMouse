@@ -397,7 +397,7 @@ let uniqueGestures = new Set();
 let isRecording = false, recordChunks = [];
 
 function initSocket() {
-    socket = io({ transports: ['websocket'] });
+    socket = io({ transports: ['polling', 'websocket'] });
     socket.on('connect', () => { setWsStatus(true); loadRecordings(); });
     socket.on('disconnect', () => setWsStatus(false));
 

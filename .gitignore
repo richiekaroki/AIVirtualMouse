@@ -59,3 +59,7 @@ motion_data/*.json
 *.task
 !src/hand_landmarker.task
 !models/hand_landmarker.task
+
+# Agent / Skill tooling
+opencode.json
+.playwright-mcp/
