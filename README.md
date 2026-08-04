@@ -140,6 +140,41 @@ This project is built on four principles:
 
 ---
 
+## User Guide
+
+### Getting Started
+
+Open the app in any browser with a camera. Click **Start** and allow camera access. A green **Live** badge confirms the connection — you'll see your hand skeleton appear instantly.
+
+### What You'll See
+
+| Element | What It Shows |
+|---------|--------------|
+| **Skeleton overlay** | Amber = primary hand, Purple = second hand |
+| **Handedness badge** | Blue "Left" or Purple "Right" based on hand orientation |
+| **Finger dots** (T I M R P) | Light up yellow as each finger extends |
+| **Gesture name** | Rule-based classification from finger positions |
+| **ML gesture** | Machine learning prediction with confidence % |
+| **Face chips** | Eyes open/closed, mouth open/closed, eyebrow raise, expression |
+| **Second hand** | Auto-appears when two hands are in frame |
+
+### Controls
+
+- **Start** — activate camera feed
+- **Stop** — disconnect camera
+- **Rec** — start/stop recording a gesture to the library
+- **Capture** — take a screenshot
+- **Play** — replay a selected recording from the library
+
+### Tips
+
+- Keep your hand 30–60 cm from the camera for best tracking
+- Good lighting improves landmark detection
+- The face section appears automatically when your face is visible
+- Two-hand gestures show both skeletons with different colors
+
+---
+
 ## Quick Start
 
 ### Python Version
