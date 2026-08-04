@@ -322,24 +322,23 @@ def register_socket_handlers(app: Flask) -> None:
 
             _server_frame_counter += 1
 
+            hands_count = detector.getHandsCount()
+
             result = {
                 "frame": _server_frame_counter,
                 "client_ts": client_ts,
-                "hands_detected": bool(lm_list and len(lm_list) > 0),
-                "landmarks": [],
-                "gesture": None,
-                "confidence": 0,
-                "fingers": [],
-                "features": None,
-                "velocity": None,
-                "ml_gesture": None,
-                "ml_confidence": 0,
-                "handedness": "Unknown",
+                "hands_detected": hands_count > 0,
+                "hands_count": hands_count,
+                "hands": [],
             }
 
-            if lm_list and len(lm_list) != 0:
-                fingers = detector.fingersUp()
-                handedness = detector.getHandedness()
+            for hand_idx in range(hands_count):
+                lm_list, bbox = detector.findPosition(img, handNo=hand_idx, draw=False)
+                if not lm_list:
+                    continue
+
+                fingers = detector.fingersUp(handNo=hand_idx)
+                handedness = detector.getHandedness(handNo=hand_idx)
                 descriptor.create_descriptor(lm_list, fingers, frame_shape=(height, width))
 
                 flat = []
@@ -348,14 +347,13 @@ def register_socket_handlers(app: Flask) -> None:
 
                 last_desc = descriptor.motion_history[-1] if descriptor.motion_history else None
 
-                # Rule-based gesture from descriptor
                 rule_gesture = last_desc["primitive"] if last_desc else None
                 rule_conf = last_desc.get("confidence", 0) if last_desc else 0
 
-                # ML-based gesture from classifier
                 ml_result = classifier.predict(lm_list)
 
-                result.update({
+                result["hands"].append({
+                    "hand_index": hand_idx,
                     "landmarks": flat,
                     "fingers": fingers,
                     "gesture": rule_gesture,
@@ -365,6 +363,21 @@ def register_socket_handlers(app: Flask) -> None:
                     "ml_gesture": ml_result.get("gesture"),
                     "ml_confidence": ml_result.get("confidence", 0),
                     "handedness": handedness,
+                })
+
+            # Backward-compatible: copy primary hand fields to top level
+            if result["hands"]:
+                primary = result["hands"][0]
+                result.update({
+                    "landmarks": primary["landmarks"],
+                    "fingers": primary["fingers"],
+                    "gesture": primary["gesture"],
+                    "confidence": primary["confidence"],
+                    "features": primary["features"],
+                    "velocity": primary["velocity"],
+                    "ml_gesture": primary["ml_gesture"],
+                    "ml_confidence": primary["ml_confidence"],
+                    "handedness": primary["handedness"],
                 })
 
             emit("frame_result", result)

@@ -211,6 +211,14 @@
         .hand-badge.left { background: var(--blue-soft); color: var(--blue); border-color: rgba(96,165,250,0.3); }
         .hand-badge.right { background: var(--purple-soft); color: var(--purple); border-color: rgba(167,139,250,0.3); }
 
+        .second-hand {
+            margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
+            display: flex; align-items: center; gap: 6px; justify-content: center;
+            font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-3);
+        }
+        .second-hand-label { text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6; }
+        .gesture-word-sm { font-family: var(--font-display); font-size: 0.9rem; font-weight: 600; color: var(--text-2); }
+
         .ml-row {
             display: flex; align-items: center; gap: 8px;
             margin-top: 10px; padding: 8px 12px;
@@ -380,6 +388,12 @@
                     <span class="ml-value" id="ml-gesture-name">--</span>
                     <span class="ml-conf" id="ml-gesture-conf"></span>
                 </div>
+                <div class="second-hand" id="second-hand" style="display:none">
+                    <span class="second-hand-label">2nd Hand</span>
+                    <span class="hand-badge" id="handedness-badge-2">--</span>
+                    <span class="gesture-word-sm" id="gesture-name-2">--</span>
+                    <span class="ml-conf" id="ml-gesture-conf-2"></span>
+                </div>
             </div>
 
             <div class="fingers-section">
@@ -431,15 +445,34 @@ function initSocket() {
     socket.on('disconnect', () => setWsStatus(false));
 
     socket.on('frame_result', d => {
-        if (d.landmarks && d.landmarks.length >= 42) {
+        if (ctx) ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+        if (d.hands && d.hands.length > 0) {
+            // Multi-hand rendering
+            d.hands.forEach(hand => {
+                if (hand.landmarks && hand.landmarks.length >= 42) {
+                    drawSkeleton(hand.landmarks, hand.hand_index);
+                }
+            });
+            // Primary hand displays in main UI
+            const primary = d.hands[0];
+            updateGesture(primary.gesture, primary.confidence);
+            updateMLGesture(primary.ml_gesture, primary.ml_confidence);
+            updateFingers(primary.fingers);
+            updateFeatures(primary.features, primary.velocity);
+            updateHandedness(primary.handedness);
+            // Second hand display
+            updateSecondHand(d.hands.length > 1 ? d.hands[1] : null);
+        } else if (d.landmarks && d.landmarks.length >= 42) {
+            // Fallback: single-hand format (playback or backward-compat)
             drawSkeleton(d.landmarks);
             updateGesture(d.gesture, d.confidence);
             updateMLGesture(d.ml_gesture, d.ml_confidence);
             updateFingers(d.fingers);
             updateFeatures(d.features, d.velocity);
             updateHandedness(d.handedness);
+            updateSecondHand(null);
         } else {
-            clearOverlay(); updateGesture(null); updateMLGesture(null); updateFingers([]); updateHandedness(null);
+            clearOverlay(); updateGesture(null); updateMLGesture(null); updateFingers([]); updateHandedness(null); updateSecondHand(null);
         }
         fpsCounter++;
         const now = Date.now();
@@ -499,16 +532,20 @@ function captureAndSend() {
     socket.emit('process_frame', { image: c.toDataURL('image/jpeg', JPEG_QUALITY).split(',')[1], width: w, height: h, client_ts: Date.now(), frame_num: frameCount });
 }
 
-function drawSkeleton(lm) {
+function drawSkeleton(lm, handIdx = 0) {
     if (!ctx || !canvasEl) return;
-    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
     const sx = canvasEl.width / 640, sy = canvasEl.height / 480;
     const conns = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
-    ctx.strokeStyle = 'rgba(245,158,11,0.6)'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    const colors = [
+        { line: 'rgba(245,158,11,0.6)', tip: '#F59E0B', joint: '#E8E8EC' },
+        { line: 'rgba(167,139,250,0.6)', tip: '#A78BFA', joint: '#C4B5FD' },
+    ];
+    const c = colors[handIdx % colors.length];
+    ctx.strokeStyle = c.line; ctx.lineWidth = 2; ctx.lineJoin = 'round';
     for (const [a, b] of conns) { ctx.beginPath(); ctx.moveTo(lm[a*2]*sx, lm[a*2+1]*sy); ctx.lineTo(lm[b*2]*sx, lm[b*2+1]*sy); ctx.stroke(); }
     for (let i = 0; i < 21; i++) {
         const x = lm[i*2]*sx, y = lm[i*2+1]*sy, tip = [4,8,12,16,20].includes(i);
-        ctx.fillStyle = tip ? '#F59E0B' : '#E8E8EC';
+        ctx.fillStyle = tip ? c.tip : c.joint;
         ctx.beginPath(); ctx.arc(x, y, tip ? 4 : 2.5, 0, Math.PI*2); ctx.fill();
     }
 }
@@ -547,6 +584,21 @@ function updateHandedness(h) {
     if (!h || h === 'Unknown') { el.textContent = '--'; el.className = 'hand-badge'; return; }
     el.textContent = h;
     el.className = 'hand-badge ' + h.toLowerCase();
+}
+
+function updateSecondHand(hand) {
+    const el = document.getElementById('second-hand');
+    if (!hand) { el.style.display = 'none'; return; }
+    el.style.display = '';
+    const badge = document.getElementById('handedness-badge-2');
+    const name = document.getElementById('gesture-name-2');
+    const conf = document.getElementById('ml-gesture-conf-2');
+    if (hand.handedness && hand.handedness !== 'Unknown') {
+        badge.textContent = hand.handedness;
+        badge.className = 'hand-badge ' + hand.handedness.toLowerCase();
+    } else { badge.textContent = '--'; badge.className = 'hand-badge'; }
+    name.textContent = hand.ml_gesture ? hand.ml_gesture.replace(/_/g, ' ') : (hand.gesture ? hand.gesture.replace(/_/g, ' ') : '--');
+    conf.textContent = hand.ml_confidence ? Math.round(hand.ml_confidence * 100) + '%' : '';
 }
 
 function toggleRecord() {

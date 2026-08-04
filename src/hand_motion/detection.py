@@ -169,20 +169,35 @@ class HandDetector:
 
         return self.handedness
 
-    def fingersUp(self) -> List[int]:
+    def fingersUp(self, handNo: int = 0) -> List[int]:
         """
         Detect which fingers are extended.
+
+        Args:
+            handNo: Hand index to check (default 0)
 
         Returns:
             List of 5 binary values [thumb, index, middle, ring, pinky]
             where 1 = extended, 0 = closed
         """
-        if not self.results or len(self.results) == 0:
+        if not self.results or len(self.results) <= handNo:
             return []
 
-        hand = self.results[0]
+        hand = self.results[handNo]
         fingers = self.detector.fingersUp(hand)
         return fingers
+
+    def getHandsCount(self) -> int:
+        """Return the number of detected hands."""
+        if not self.results:
+            return 0
+        return len(self.results)
+
+    def getHandednessAll(self) -> List[str]:
+        """Return handedness for all detected hands."""
+        if not self.results:
+            return []
+        return [self.getHandedness(i) for i in range(len(self.results))]
 
     def findDistance(
         self,
