@@ -12,15 +12,21 @@
 
 Originally built for gesture-based cursor control, this project evolved into a full motion interpretation pipeline that treats hand gestures as **structured linguistic data**, making it suitable for sign language research, animation systems, and accessibility applications.
 
-## What's New in v0.8.0
+## What's New in v0.9.0
 
-- **Browser Webcam Support**: Real-time gesture recognition via WebSocket — no desktop app required
-- **ML Gesture Classifier**: RandomForest model trained on 15 gestures (78 features, 64% accuracy)
-- **32 Gesture Primitives**: All finger combinations mapped (was 8)
-- **Motion Gesture Detection**: Circle, wave, and swipe recognition from position history
-- **Web UI**: Clean, responsive interface with live skeleton overlay
-- **Render Deployment**: One-click deploy at `https://hand-motion-pipeline.onrender.com`
-- **142 Unit Tests**: Comprehensive coverage across all modules
+- **12 AI Features**: Complete sign language recognition pipeline
+- **Handedness Labeling**: Left/right hand identification in real-time
+- **Two-Hand Detection**: Multi-hand support with distinct skeleton colors
+- **Non-Manual Markers**: Face mesh (eyes, mouth, eyebrows, head) wired into UI
+- **Continuous CSLR**: CTC/attention decoding for variable-length gloss sequences
+- **DTW Dictionary**: Template-based sign matching
+- **Fingerspelling A-Z**: Individual letter detection from handshape
+- **HID Output**: Gesture-to-keyboard/mouse control
+- **Gloss-to-Text NLP**: Seq2Seq attention translation model
+- **Transformer CSLR**: Vision Transformer architecture
+- **Temporal Smoothing**: EMA confidence values
+- **Platt Calibration**: Calibrated ML confidence scores
+- **Data Augmentation**: Rotation, scale, noise, time warping
 
 ---
 
@@ -62,17 +68,25 @@ This project is built on four principles:
                 │
 ┌───────────────▼────────────────────────────┐
 │          Flask + SocketIO Server           │
-│  MediaPipe Hands → 21 Landmarks           │
+│  MediaPipe Hands → N hands × 21 landmarks │
+│  + Face Mesh → non-manual markers         │
 └───────────────┬────────────────────────────┘
                 │
-        ┌───────┼────────────┐
-        │       │            │
-┌───────▼───┐ ┌─▼──────────┐ ┌▼─────────────┐
-│ Rule-Based│ │ ML Random  │ │ Motion       │
-│ 32 combos │ │ Forest     │ │ Circle/Wave/ │
-│ + motion  │ │ 15 gestures│ │ Swipe        │
-└───────┬───┘ └─┬──────────┘ └┬─────────────┘
-        └───────┼────────────┘
+    ┌───────────┼──────────┬──────────┐
+    │           │          │          │
+┌───▼───┐  ┌───▼──┐  ┌───▼───┐  ┌──▼──────┐
+│ Rule  │  │ ML   │  │ Face  │  │ Handed  │
+│ Based │  │ RF+  │  │ EAR/  │  │ Left/   │
+│ 32    │  │ Platt│  │ MAR   │  │ Right   │
+│ combos│  │ Cal. │  │ Brows │  │ +2 hands│
+└───┬───┘  └───┬──┘  └───┬───┘  └──┬──────┘
+    └───────────┼─────────┼─────────┘
+                │
+┌───────────────▼────────────────────────────┐
+│          AI Modules                       │
+│  Continuous CSLR · DTW · Fingerspelling   │
+│  HID Output · NLP Translator · ViT        │
+└───────────────┬────────────────────────────┘
                 │
 ┌───────────────▼────────────────────────────┐
 │          Browser Canvas                    │
@@ -95,6 +109,23 @@ This project is built on four principles:
 - **ML-based**: RandomForest classifier trained on 15 gestures (64% accuracy)
 - Both run simultaneously, results shown side-by-side
 
+### 12 AI Features
+
+| # | Feature | What It Does |
+|---|---------|-------------|
+| 1 | Handedness labeling | Shows Left/Right badge per hand |
+| 2 | Two-hand detection | Renders both hands with distinct colors |
+| 3 | Temporal smoothing | EMA-smoothed confidence values |
+| 4 | Confidence calibration | Platt-scaled RF probabilities |
+| 5 | Data augmentation | Rotation, scale, noise, time warp |
+| 6 | Non-manual markers | Face mesh (eyes, mouth, eyebrows, head) |
+| 7 | Continuous CSLR | CTC/attention gloss decoding |
+| 8 | DTW dictionary | Template matching recognition |
+| 9 | Fingerspelling | ASL A-Z letter detection |
+| 10 | HID output | Gesture-to-keyboard/mouse |
+| 11 | Gloss-to-text NLP | Seq2Seq attention translation |
+| 12 | Transformer CSLR | Vision Transformer architecture |
+
 ### Motion Detection
 - **Circle**: Radius + angular analysis from index tip positions
 - **Wave**: X-axis oscillation detection over 15 frames
@@ -102,7 +133,8 @@ This project is built on four principles:
 
 ### Web UI
 - Responsive split-screen layout (camera + panel)
-- Live hand skeleton overlay
+- Live hand skeleton overlay (amber/purple for two hands)
+- Face expression chips (Face, Eyes, Mouth, Brow)
 - Recording library with playback
 - Session statistics
 
@@ -195,14 +227,14 @@ python -m pytest tests/ -v --tb=short
 AIVirtualMouse/
 ├── src/hand_motion/
 │   ├── __init__.py
-│   ├── detection.py              # Hand tracking (MediaPipe/cvzone)
+│   ├── detection.py              # Hand tracking (MediaPipe/cvzone) + handedness + multi-hand
 │   ├── descriptor.py             # Core abstraction (32 primitives)
 │   ├── analyzer.py               # Analysis toolkit
 │   ├── animation.py              # 3D animation export
 │   ├── batch.py                  # Batch processing
 │   ├── database.py               # SQLite storage
 │   ├── export.py                 # Multi-format export
-│   ├── face.py                   # Face mesh (MediaPipe)
+│   ├── face.py                   # Face mesh (468 landmarks, EAR/MAR/brows/head)
 │   ├── gloss.py                  # Gloss annotation
 │   ├── gpu.py                    # GPU acceleration
 │   ├── pose.py                   # Body tracking (MediaPipe Pose)
@@ -210,10 +242,16 @@ AIVirtualMouse/
 │   ├── video_export.py           # Video export
 │   ├── ai/
 │   │   ├── __init__.py
-│   │   ├── landmark_classifier.py    # ML classifier (RandomForest)
+│   │   ├── landmark_classifier.py    # ML classifier (RandomForest + Platt scaling)
 │   │   ├── gesture_recognizer.py     # CNN+LSTM architecture
-│   │   ├── inference_engine.py       # Frame buffering + sliding window
-│   │   └── translator.py             # Gesture translation
+│   │   ├── inference_engine.py       # Frame buffering + EMA smoothing
+│   │   ├── translator.py             # Gesture translation + Seq2Seq NLP
+│   │   ├── augmentation.py           # Landmark data augmentation
+│   │   ├── continuous_recognizer.py  # CTC/attention continuous CSLR
+│   │   ├── dtw_dictionary.py         # DTW template matching
+│   │   ├── fingerspelling.py         # ASL A-Z letter detection
+│   │   ├── hid_output.py             # BLE/USB HID gesture-to-input
+│   │   └── transformer_cslr.py       # Vision Transformer CSLR
 │   ├── web/
 │   │   ├── __init__.py
 │   │   ├── __main__.py               # Entry point
@@ -234,7 +272,7 @@ AIVirtualMouse/
 ├── tests/
 │   └── test_*.py                 # 142 tests
 ├── examples/                     # Usage examples
-├── docs/                         # Documentation
+├── docs/                         # Documentation + DESIGN.md
 ├── scripts/                      # Utility scripts
 ├── Dockerfile                    # Render deployment
 ├── render.yaml                   # Render blueprint
@@ -285,24 +323,17 @@ python -m pytest tests/ -x -q
 
 ## Roadmap
 
-### Phase 1 — Extended Motion Capture
-- MediaPipe Pose (body tracking)
-- MediaPipe Face Mesh (expressions)
-- Two-handed coordination
+### Completed (v0.9.0)
+- 12 AI features: handedness, two-hand, smoothing, calibration, augmentation, face, CSLR, DTW, fingerspelling, HID, NLP, Transformer
+- Face mesh integration for non-manual markers
+- Security hardening (CORS, headers, non-root Docker)
+- SEO/accessibility improvements
 
-### Phase 2 — Linguistic Layer
-- Gloss annotation tools
-- Co-articulation modeling
-- Deaf community validation
-
-### Phase 3 — Animation Output
-- 3D rig integration (Blender / Three.js)
-- Motion retargeting
-
-### Phase 4 — Translation Pipeline
-- Text → gloss (NLP)
-- Gloss → motion synthesis
-- Real-time deployment
+### Next
+- BERT/Transformer NLP for gloss-to-text
+- Federated learning for multi-user training
+- Mobile TFLite/ONNX deployment
+- 3D animation export (Blender/Three.js)
 
 ---
 
@@ -335,9 +366,10 @@ Nairobi, Kenya
 ## Project Status
 
 - **Status:** Active Development
-- **Version:** 0.8.0
+- **Version:** 0.9.0
 - **Last Updated:** August 2026
 - **Test Status:** 142 tests passing
+- **AI Features:** 12 integrated
 - **Deploy:** [https://hand-motion-pipeline.onrender.com](https://hand-motion-pipeline.onrender.com)
 
 ---

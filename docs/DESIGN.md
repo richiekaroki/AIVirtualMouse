@@ -24,16 +24,36 @@ A single motion capture feeds into multiple use cases:
 
 ### 3. Separation of Concerns
 
-- **Detection**: Raw landmark extraction
+- **Detection**: Raw landmark extraction + handedness + multi-hand
 - **Descriptor**: Structured representation + classification
-- **AI**: ML-based gesture classification
-- **Web**: Browser interface + real-time streaming
+- **AI**: ML-based gesture classification + continuous recognition + DTW + fingerspelling
+- **Web**: Browser interface + real-time streaming + face mesh
 - **Analyzer**: Offline analysis
 
 ### 4. Dual Classification
 
 - **Rule-based**: Instant lookup from 32 finger combinations + motion patterns
 - **ML-based**: RandomForest trained on recorded gestures (64% accuracy)
+- Both run simultaneously, results shown side-by-side
+
+### 5. AI Feature Stack
+
+12 integrated AI features form the recognition pipeline:
+
+| # | Feature | Module | Purpose |
+|---|---------|--------|---------|
+| 1 | Handedness labeling | `detection.py` | Left/right hand identification |
+| 2 | Two-hand detection | `detection.py` | Multi-hand landmark extraction |
+| 3 | Temporal smoothing | `inference_engine.py` | EMA confidence smoothing |
+| 4 | Confidence calibration | `landmark_classifier.py` | Platt scaling on RF outputs |
+| 5 | Data augmentation | `augmentation.py` | Rotation, scale, noise, time warp |
+| 6 | Non-manual markers | `face.py` | Facial expressions for sign language |
+| 7 | Continuous CSLR | `continuous_recognizer.py` | CTC/attention gloss decoding |
+| 8 | DTW dictionary | `dtw_dictionary.py` | Template matching recognition |
+| 9 | Fingerspelling | `fingerspelling.py` | A-Z letter detection |
+| 10 | HID output | `hid_output.py` | Gesture-to-keyboard/mouse |
+| 11 | Gloss-to-text NLP | `translator.py` | Seq2Seq attention translation |
+| 12 | Transformer CSLR | `transformer_cslr.py` | ViT-based recognition |
 
 ---
 
@@ -48,19 +68,21 @@ A single motion capture feeds into multiple use cases:
 +------------------v-----------------------+
 |         Flask + SocketIO Server          |
 |  handle_process_frame -> MediaPipe       |
+|  + FaceDetector (non-manual markers)     |
 +------------------+-----------------------+
                    |
-       +-----------+-----------+
-       |           |           |
-+------v---+ +-----v----+ +---v----------+
-| Rule     | | ML       | | Motion       |
-| 32 combos| | Forest   | | Circle/Wave  |
-+------+---+ +-----+----+ +---+----------+
-       +-----------+-----------+
+       +-----------+-----------+-----------+
+       |           |           |           |
++------v---+ +-----v----+ +---v--------+ +v----------+
+| Rule     | | ML       | | Face       | | Handedness|
+| 32 combos| | Forest+  | | EAR/MAR/   | | Left/Right|
+| + motion | | Platt    | | Brows/Head | | + 2 hands |
++------+---+ +-----+----+ +---+--------+ +---+------+
+       +-----------+-----------+-----------+
                    |
 +------------------v-----------------------+
 |         Browser Canvas + UI              |
-|  Skeleton + Gesture display + Library    |
+|  Skeleton + Gesture + Face + Library     |
 +------------------------------------------+
 ```
 
@@ -74,6 +96,9 @@ A single motion capture feeds into multiple use cases:
 - `staticMode=True` by default — prevents timestamp crashes
 - Thread-safe via `_mediapipe_lock` in web server
 - Suppresses C++ stderr warnings via `_Suppress_stderr`
+- **Multi-hand**: `getHandsCount()`, `findPosition(handNo=N)`
+- **Handedness**: `getHandedness()` using wrist-vs-MCP heuristic
+- **Finger detection**: `fingersUp(handNo=N)` for any hand
 
 ### 2. MotionDescriptor (descriptor.py)
 
@@ -85,15 +110,35 @@ A single motion capture feeds into multiple use cases:
 
 - RandomForest (100 trees, max_depth=10)
 - 78 features extracted from 21 landmarks
+- Platt scaling for calibrated confidence scores
+- Data augmentation: rotation, scale, noise, time warp, mirror
 - Trained on 15 gestures from motion_data/
-- 64% accuracy on test set
 
-### 4. Web Server (web/app.py)
+### 4. FaceDetector (face.py)
 
-- `process_frame`: Receives base64 JPEG, runs MediaPipe, returns results
+- 468-point MediaPipe Face Mesh
+- Eye Aspect Ratio (EAR) — blink detection
+- Mouth Aspect Ratio (MAR) — mouth open/close
+- Eyebrow height — questioning expressions
+- Head orientation — yaw, pitch, roll estimation
+- Facial expression classification for non-manual markers
+
+### 5. Web Server (web/app.py)
+
+- `process_frame`: Receives base64 JPEG, runs MediaPipe + Face, returns results
 - `play_recording`: Streams recorded gestures frame-by-frame
 - `_mediapipe_lock`: Serializes all MediaPipe calls
 - `_camera_streams`: Per-connection state tracking
+- Security: CORS restricted, security headers, non-root Docker
+
+### 6. AI Modules
+
+- **ContinuousRecognizer** (`continuous_recognizer.py`): CTC + attention decoding for variable-length gloss sequences
+- **DTWDictionary** (`dtw_dictionary.py`): Template-based sign matching with Sakoe-Chiba band constraint
+- **FingerspellingDetector** (`fingerspelling.py`): ASL A-Z letter recognition from handshape geometry
+- **HIDController** (`hid_output.py`): Gesture-to-keyboard/mouse mapping via pynput/pyautogui
+- **NeuralGlossTranslator** (`translator.py`): Seq2Seq attention model for gloss-to-text
+- **TransformerCSLR** (`transformer_cslr.py`): ViT architecture replacing CNN+LSTM
 
 ---
 
@@ -104,10 +149,28 @@ A single motion capture feeds into multiple use cases:
 ```
 Camera -> base64 JPEG -> WebSocket -> Server
   -> cv2.imdecode -> cv2.flip
-  -> MediaPipe Hands -> 21 landmarks
+  -> FaceDetector -> facial expression markers
+  -> MediaPipe Hands -> N hands x 21 landmarks
+  -> Handedness: Left/Right per hand
   -> Rule: PRIMITIVE_MAP -> gesture
-  -> ML: LandmarkClassifier -> ml_gesture
-  -> WebSocket -> Browser canvas + UI
+  -> ML: LandmarkClassifier (Platt-calibrated) -> ml_gesture
+  -> WebSocket -> Browser canvas + UI + Face chips
+```
+
+### Continuous Recognition Flow
+
+```
+Landmark sequence -> FrameBuffer -> TransformerCSLR/ContinuousRecognizer
+  -> CTC/Attention decoder -> gloss tokens
+  -> NeuralGlossTranslator -> natural language text
+```
+
+### Template Matching Flow
+
+```
+Landmark sequence -> DTWDictionary.recognize()
+  -> DTW distance to all templates
+  -> Best match with confidence score
 ```
 
 ### Recording Playback
@@ -193,21 +256,29 @@ Server: Read JSON, flatten landmarks
 
 ## Future Extensibility
 
-### Planned Extensions
+### Completed Features (v0.9.0)
 
-1. **MediaPipe Pose** — Body position, two-handed coordination
-2. **MediaPipe Face Mesh** — Facial expressions, non-manual markers
-3. **3D Animation** — Blender/Three.js integration, motion retargeting
-4. **ML Translation** — Sequence-to-sequence models, gloss annotation
+1. **Handedness labeling** — Left/right hand identification via landmark heuristic
+2. **Two-hand detection** — Multi-hand support with per-hand rendering
+3. **Temporal smoothing** — EMA on confidence values for stable output
+4. **Confidence calibration** — Platt scaling on Random Forest probabilities
+5. **Data augmentation** — Rotation, scaling, noise, time warping, mirror
+6. **Non-manual markers** — Face mesh wired into pipeline (EAR, MAR, eyebrows)
+7. **Continuous CSLR** — CTC + attention decoder for variable-length glosses
+8. **DTW dictionary** — Template matching with Sakoe-Chiba band
+9. **Fingerspelling** — ASL A-Z letter detection from handshape geometry
+10. **HID output** — Gesture-to-keyboard/mouse mapping
+11. **Gloss-to-text NLP** — Seq2Seq attention translation model
+12. **Transformer CSLR** — ViT architecture replacing CNN+LSTM
 
-### Extension Points
+### Future Extensions
 
-- **New primitives**: Add to `PRIMITIVE_MAP`
-- **New features**: Extend `_calculate_*` methods
-- **New gestures**: Add recordings to `motion_data/`, retrain classifier
-- **New outputs**: Create new app modules or web endpoints
+1. **BERT/Transformer NLP** — Pre-trained language model for gloss-to-text
+2. **3D Animation** — Blender/Three.js integration, motion retargeting
+3. **Federated Learning** — Privacy-preserving multi-user model training
+4. **Mobile Deployment** — TFLite/ONNX for on-device inference
 
 ---
 
-*Document Version: 2.0*
+*Document Version: 3.0*
 *Last Updated: August 2026*
