@@ -147,19 +147,30 @@ class LandmarkClassifier:
         """Extract feature vector from 21 hand landmarks."""
         return _landmarks_to_features(lm_list)
 
-    def train_from_directory(self, data_dir: str, min_confidence: float = 0.0) -> Dict[str, Any]:
+    def train_from_directory(
+        self,
+        data_dir: str,
+        min_confidence: float = 0.0,
+        augment: bool = True,
+        augment_factor: int = 3,
+    ) -> Dict[str, Any]:
         """
         Train classifier from a directory of recording JSON files.
 
         Args:
             data_dir: Path to directory containing gesture JSON files
             min_confidence: Minimum confidence threshold for including frames
+            augment: Whether to apply data augmentation
+            augment_factor: Number of augmented copies per original sample
 
         Returns:
             Training report with accuracy and gesture counts
         """
         if not SKLEARN_AVAILABLE:
             return {"error": "scikit-learn not installed"}
+
+        from hand_motion.ai.augmentation import LandmarkAugmenter
+        augmenter = LandmarkAugmenter() if augment else None
 
         X_all = []
         y_all = []
@@ -175,13 +186,29 @@ class LandmarkClassifier:
                 gesture = data.get("metadata", {}).get("gesture_name", "unknown")
                 frames = data.get("frames", [])
 
+                # Collect raw landmarks for this gesture
+                raw_frames = []
                 for frame in frames:
                     lm = frame.get("landmarks", [])
                     if len(lm) < 21:
                         continue
+                    raw_frames.append(lm)
+
+                # Add original samples
+                for lm in raw_frames:
                     features = self.extract_features(lm)
                     X_all.append(features)
                     y_all.append(gesture)
+
+                # Add augmented samples
+                if augmenter and augment and raw_frames:
+                    for _ in range(augment_factor):
+                        aug_frames = augmenter.augment_sequence(raw_frames, probability=0.9)
+                        for lm in aug_frames:
+                            features = self.extract_features(lm)
+                            X_all.append(features)
+                            y_all.append(gesture)
+
             except Exception as e:
                 logger.warning("Skipping %s: %s", json_file, e)
 
@@ -222,6 +249,8 @@ class LandmarkClassifier:
             "n_classes": len(set(y)),
             "gestures": dict(Counter(y)),
             "feature_dim": X.shape[1],
+            "augmented": augment,
+            "augment_factor": augment_factor if augment else 0,
         }
         logger.info("Trained classifier: %.1f%% accuracy (%d samples, %d classes)",
                      report["accuracy_mean"] * 100, report["n_samples"], report["n_classes"])
