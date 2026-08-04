@@ -257,6 +257,7 @@
         }
         .feat-chip .k { color: var(--text-3); }
         .feat-chip .v { color: var(--accent); font-variant-numeric: tabular-nums; }
+        .face-chip { border: 1px solid rgba(167,139,250,0.2); }
 
         /* ── Recordings ── */
         .rec-section {
@@ -410,6 +411,15 @@
                 </div>
             </div>
 
+            <div class="feat-section" id="face-section" style="display:none">
+                <div class="feat-row">
+                    <div class="feat-chip face-chip"><span class="k">Face</span><span class="v" id="face-expr">--</span></div>
+                    <div class="feat-chip face-chip"><span class="k">Eyes</span><span class="v" id="face-eyes">--</span></div>
+                    <div class="feat-chip face-chip"><span class="k">Mouth</span><span class="v" id="face-mouth">--</span></div>
+                    <div class="feat-chip face-chip"><span class="k">Brow</span><span class="v" id="face-brow">--</span></div>
+                </div>
+            </div>
+
             <div class="rec-section">
                 <div class="rec-header">
                     <span class="rec-title">Library</span>
@@ -474,6 +484,8 @@ function initSocket() {
         } else {
             clearOverlay(); updateGesture(null); updateMLGesture(null); updateFingers([]); updateHandedness(null); updateSecondHand(null);
         }
+        // Non-manual markers (face)
+        updateFace(d.face);
         fpsCounter++;
         const now = Date.now();
         if (now - lastFpsTime >= 1000) { document.getElementById('fps-display').textContent = fpsCounter + ' FPS'; fpsCounter = 0; lastFpsTime = now; }
@@ -599,6 +611,16 @@ function updateSecondHand(hand) {
     } else { badge.textContent = '--'; badge.className = 'hand-badge'; }
     name.textContent = hand.ml_gesture ? hand.ml_gesture.replace(/_/g, ' ') : (hand.gesture ? hand.gesture.replace(/_/g, ' ') : '--');
     conf.textContent = hand.ml_confidence ? Math.round(hand.ml_confidence * 100) + '%' : '';
+}
+
+function updateFace(face) {
+    const section = document.getElementById('face-section');
+    if (!face) { section.style.display = 'none'; return; }
+    section.style.display = '';
+    document.getElementById('face-expr').textContent = face.expression || 'neutral';
+    document.getElementById('face-eyes').textContent = face.eyes_open ? 'open' : 'closed';
+    document.getElementById('face-mouth').textContent = face.mouth_open ? 'open' : 'closed';
+    document.getElementById('face-brow').textContent = face.eyebrows_raised ? 'raised' : 'neutral';
 }
 
 function toggleRecord() {

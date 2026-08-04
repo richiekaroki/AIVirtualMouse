@@ -238,6 +238,7 @@ _camera_streams: Dict[str, Dict[str, Any]] = {}
 _detector = None
 _descriptor = None
 _classifier = None
+_face_analyzer = None
 _server_frame_counter = 0
 _mediapipe_lock = threading.Lock()
 
@@ -255,7 +256,7 @@ class _Suppress_stderr:
 
 
 def _get_detector():
-    global _detector, _descriptor, _classifier
+    global _detector, _descriptor, _classifier, _face_analyzer
     if _detector is None:
         from hand_motion.detection import HandDetector
         from hand_motion.descriptor import MotionDescriptor
@@ -267,7 +268,13 @@ def _get_detector():
         if not _classifier.is_trained:
             data_dir = Path(__file__).parent.parent.parent.parent / "motion_data"
             _classifier.train_from_directory(str(data_dir))
-            _classifier.save_model()
+    if _face_analyzer is None:
+        try:
+            from hand_motion.face import FacialExpressionAnalyzer
+            _face_analyzer = FacialExpressionAnalyzer()
+        except Exception as e:
+            logger.warning("Face analyzer init failed: %s", e)
+            _face_analyzer = False
     return _detector, _descriptor, _classifier
 
 
@@ -315,6 +322,15 @@ def register_socket_handlers(app: Flask) -> None:
             detector, descriptor, classifier = _get_detector()
 
             img = cv2.flip(img, 1)
+
+            # Face analysis for non-manual markers
+            face_result = None
+            if _face_analyzer and _face_analyzer is not False:
+                try:
+                    face_result = _face_analyzer.analyze_frame(img)
+                except Exception:
+                    face_result = None
+
             with _mediapipe_lock:
                 with _Suppress_stderr():
                     img = detector.findHands(img, draw=False)
@@ -330,7 +346,18 @@ def register_socket_handlers(app: Flask) -> None:
                 "hands_detected": hands_count > 0,
                 "hands_count": hands_count,
                 "hands": [],
+                "face": None,
             }
+
+            # Attach non-manual markers if face analysis succeeded
+            if face_result and "error" not in face_result:
+                result["face"] = {
+                    "expression": face_result.get("classified", "neutral"),
+                    "eyes_open": face_result.get("eyes_open", True),
+                    "mouth_open": face_result.get("mouth_open", False),
+                    "eyebrows_raised": face_result.get("eyebrows_raised", False),
+                    "head_orientation": face_result.get("head_orientation", {}),
+                }
 
             for hand_idx in range(hands_count):
                 lm_list, bbox = detector.findPosition(img, handNo=hand_idx, draw=False)
@@ -379,6 +406,10 @@ def register_socket_handlers(app: Flask) -> None:
                     "ml_confidence": primary["ml_confidence"],
                     "handedness": primary["handedness"],
                 })
+
+            # Include non-manual markers in backward-compatible fields
+            if result["face"]:
+                result["non_manual"] = result["face"]
 
             emit("frame_result", result)
 
