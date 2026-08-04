@@ -7,14 +7,31 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-142%20passing-brightgreen.svg)]()
 [![Focus](https://img.shields.io/badge/focus-accessibility%20tech-purple.svg)]()
+[![Live Demo](https://img.shields.io/badge/live-demo-amber?logo=docker&logoColor=white)](https://hand-motion-pipeline.onrender.com)
+
+**Why this matters:** 70 million people worldwide use sign language — most speech-to-text systems ignore them. This project builds the missing layer: real-time hand gesture recognition that treats motion as structured data, not just pixels.
+
+<!-- Demo: replace the line below with your screen recording -->
+<!-- ![Demo](docs/demo.gif) -->
+<p align="center"><em>🎬 Demo: <a href="https://hand-motion-pipeline.onrender.com">Try it live</a> — grant camera access, then show your hand. The skeleton overlay and gesture labels appear in real time.</em></p>
 
 > **A real-time motion capture and analysis system designed as foundational infrastructure for sign language translation and accessibility technology.**
 
 Originally built for gesture-based cursor control, this project evolved into a full motion interpretation pipeline that treats hand gestures as **structured linguistic data**, making it suitable for sign language research, animation systems, and accessibility applications.
 
-## What's New in v0.9.0
+### At a Glance
 
-- **12 AI Features**: Complete sign language recognition pipeline
+| | |
+|---|---|
+| **What it does** | Recognizes 32 hand gestures in real time via webcam, with live skeleton overlay |
+| **How** | Dual classification: rule-based (32 combos) + ML (RandomForest, from scratch) |
+| **Stack** | Python, MediaPipe, Flask, SocketIO, deployed on Render |
+| **Tests** | 142 passing, per-module coverage |
+| **Status** | Active — v0.9.0, 12 AI features integrated |
+
+<details>
+<summary><strong>What's New in v0.9.0</strong> (12 AI features)</summary>
+
 - **Handedness Labeling**: Left/right hand identification in real-time
 - **Two-Hand Detection**: Multi-hand support with distinct skeleton colors
 - **Non-Manual Markers**: Face mesh (eyes, mouth, eyebrows, head) wired into UI
@@ -27,6 +44,8 @@ Originally built for gesture-based cursor control, this project evolved into a f
 - **Temporal Smoothing**: EMA confidence values
 - **Platt Calibration**: Calibrated ML confidence scores
 - **Data Augmentation**: Rotation, scale, noise, time warping
+
+</details>
 
 ---
 
@@ -47,9 +66,7 @@ Originally built for gesture-based cursor control, this project evolved into a f
 
 ## Project Vision
 
-Sign language translation isn't about generating smooth animations — it's about **preserving meaning through motion**.
-
-This project is built on four principles:
+Sign language translation isn't about generating smooth animations — it's about **preserving meaning through motion**. This project treats hand gestures as **structured linguistic data**, built on four principles:
 
 - **Motion as data**, not just visuals
 - **Sequences over frames** (signs are temporal)

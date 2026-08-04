@@ -22,304 +22,7 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23F59E0B' stroke-width='2.5'><path d='M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0'/><path d='M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2'/><path d='M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8'/><path d='M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 13'/></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg: #0C0C0E;
-            --surface: #141418;
-            --elevated: #1C1C22;
-            --raised: #24242C;
-            --border: #2A2A32;
-            --text: #E8E8EC;
-            --text-2: #A0A0AC;
-            --text-3: #6B6B76;
-            --accent: #F59E0B;
-            --accent-soft: #F59E0B18;
-            --accent-mid: #F59E0B40;
-            --green: #34D399;
-            --green-soft: #34D39918;
-            --red: #EF4444;
-            --red-soft: #EF444418;
-            --purple: #A78BFA;
-            --purple-soft: #A78BFA18;
-            --blue: #60A5FA;
-            --blue-soft: #60A5FA18;
-            --font-display: 'Space Grotesk', system-ui, sans-serif;
-            --font-body: 'DM Sans', system-ui, sans-serif;
-            --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
-            --ease: cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: var(--font-body); background: var(--bg); color: var(--text); line-height: 1.55; -webkit-font-smoothing: antialiased; overflow: hidden; height: 100vh; }
-        body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background-image: radial-gradient(circle, #ffffff05 1px, transparent 1px);
-            background-size: 24px 24px;
-            pointer-events: none;
-            z-index: 0;
-        }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
-
-        .app { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100vh; }
-
-        /* ── Header ── */
-        .header {
-            padding: 10px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: var(--surface);
-            border-bottom: 1px solid var(--border);
-            flex-shrink: 0;
-            height: 48px;
-        }
-        .header-left { display: flex; align-items: center; gap: 10px; }
-        .logo-mark {
-            width: 28px; height: 28px;
-            background: var(--accent);
-            border-radius: 7px;
-            display: grid; place-items: center;
-        }
-        .logo-mark svg { width: 16px; height: 16px; color: var(--bg); }
-        .brand { font-family: var(--font-display); font-size: 0.85rem; font-weight: 600; letter-spacing: -0.2px; }
-        .header-right { display: flex; align-items: center; gap: 10px; }
-        .ws-pill {
-            display: inline-flex; align-items: center; gap: 5px;
-            font-family: var(--font-mono); font-size: 0.62rem; font-weight: 500;
-            padding: 3px 8px; border-radius: 5px;
-            transition: all 250ms var(--ease);
-        }
-        .ws-pill.on { background: var(--green-soft); color: var(--green); }
-        .ws-pill.off { background: var(--red-soft); color: var(--red); }
-        .ws-dot { width: 5px; height: 5px; border-radius: 50%; }
-        .ws-dot.on { background: var(--green); box-shadow: 0 0 8px var(--green); }
-        .ws-dot.off { background: var(--red); }
-        .fps-tag {
-            font-family: var(--font-mono); font-size: 0.62rem; font-weight: 500;
-            color: var(--accent); padding: 3px 8px; border-radius: 5px;
-            background: var(--accent-soft); border: 1px solid var(--accent-mid);
-        }
-
-        /* ── Main: Camera + Panel ── */
-        .main {
-            display: grid;
-            grid-template-columns: 1fr 340px;
-            flex: 1;
-            overflow: hidden;
-        }
-        @media (max-width: 900px) { .main { grid-template-columns: 1fr; } }
-
-        /* ── Camera ── */
-        .cam-col { display: flex; flex-direction: column; padding: 16px; gap: 12px; overflow: hidden; }
-        .cam-wrap {
-            position: relative;
-            background: #08080A;
-            border-radius: 14px;
-            overflow: hidden;
-            flex: 1;
-            min-height: 0;
-            border: 1px solid var(--border);
-        }
-        .cam-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .cam-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-        .cam-empty {
-            position: absolute; inset: 0;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
-        }
-        .cam-empty-icon {
-            width: 60px; height: 60px; border-radius: 50%;
-            background: var(--elevated);
-            display: grid; place-items: center;
-            border: 1px solid var(--border);
-        }
-        .cam-empty-icon svg { width: 26px; height: 26px; color: var(--text-3); }
-        .cam-empty-text { font-size: 0.8rem; color: var(--text-3); }
-        .cam-empty-text strong { color: var(--text-2); }
-
-        .cam-overlay {
-            position: absolute; top: 10px; right: 10px;
-            display: flex; gap: 5px; z-index: 5;
-        }
-        .cam-tag {
-            font-family: var(--font-mono); font-size: 0.58rem; font-weight: 500;
-            padding: 3px 8px; border-radius: 5px;
-            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-        }
-        .tag-live { background: rgba(239,68,68,0.15); color: #FCA5A5; border: 1px solid rgba(239,68,68,0.25); display: none; }
-        .tag-live .blink { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #FCA5A5; margin-right: 4px; animation: blink 1.4s infinite; }
-        @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
-
-        /* ── Controls row ── */
-        .ctrl-row { display: flex; gap: 6px; flex-shrink: 0; }
-        .btn {
-            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-            padding: 8px 14px; border-radius: 8px;
-            border: 1px solid transparent;
-            font-family: var(--font-body); font-size: 0.75rem; font-weight: 600;
-            cursor: pointer; transition: all 180ms var(--ease); outline: none;
-        }
-        .btn:active { transform: scale(0.97); }
-        .btn:focus-visible { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--accent); }
-        .btn svg { width: 14px; height: 14px; flex-shrink: 0; }
-        .btn-accent { background: var(--accent); color: var(--bg); }
-        .btn-accent:hover { background: #D97706; }
-        .btn-red { background: var(--red); color: white; }
-        .btn-red:hover { background: #DC2626; }
-        .btn-subtle { background: var(--elevated); color: var(--text-2); border-color: var(--border); }
-        .btn-subtle:hover { background: var(--raised); color: var(--text); }
-        .btn:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
-        .btn-record {
-            background: var(--red-soft); color: var(--red); border-color: rgba(239,68,68,0.25);
-            animation: pulse-rec 2s infinite;
-        }
-        @keyframes pulse-rec { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } 50% { box-shadow: 0 0 0 4px rgba(239,68,68,0.15); } }
-
-        /* ── Right Panel ── */
-        .panel {
-            background: var(--surface);
-            border-left: 1px solid var(--border);
-            display: flex; flex-direction: column;
-            overflow-y: auto;
-        }
-
-        /* Gesture hero */
-        .gesture-section {
-            padding: 20px 20px 16px;
-            border-bottom: 1px solid var(--border);
-            text-align: center;
-        }
-        .gesture-word {
-            font-family: var(--font-display);
-            font-size: 2.2rem; font-weight: 700;
-            letter-spacing: -1px; line-height: 1;
-            color: var(--text-3);
-            transition: color 200ms var(--ease);
-        }
-        .gesture-word.active { color: var(--accent); }
-        .gesture-meta { font-size: 0.68rem; color: var(--text-3); margin-top: 6px; font-family: var(--font-mono); display: flex; justify-content: center; gap: 8px; align-items: center; }
-        .hand-badge {
-            display: inline-flex; align-items: center; gap: 4px;
-            padding: 2px 8px; border-radius: 4px;
-            font-family: var(--font-mono); font-size: 0.58rem; font-weight: 600;
-            background: var(--elevated); color: var(--text-3);
-            border: 1px solid var(--border);
-            transition: all 200ms var(--ease);
-        }
-        .hand-badge.left { background: var(--blue-soft); color: var(--blue); border-color: rgba(96,165,250,0.3); }
-        .hand-badge.right { background: var(--purple-soft); color: var(--purple); border-color: rgba(167,139,250,0.3); }
-
-        .second-hand {
-            margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
-            display: flex; align-items: center; gap: 6px; justify-content: center;
-            font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-3);
-        }
-        .second-hand-label { text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6; }
-        .gesture-word-sm { font-family: var(--font-display); font-size: 0.9rem; font-weight: 600; color: var(--text-2); }
-
-        .ml-row {
-            display: flex; align-items: center; gap: 8px;
-            margin-top: 10px; padding: 8px 12px;
-            background: var(--elevated); border-radius: 8px;
-        }
-        .ml-label { font-family: var(--font-mono); font-size: 0.55rem; font-weight: 500; color: var(--purple); text-transform: uppercase; letter-spacing: 0.5px; }
-        .ml-value { font-family: var(--font-display); font-size: 0.82rem; font-weight: 600; color: var(--text); }
-        .ml-conf { font-size: 0.62rem; color: var(--text-3); margin-left: auto; font-family: var(--font-mono); }
-
-        /* Fingers */
-        .fingers-section { padding: 14px 20px; border-bottom: 1px solid var(--border); }
-        .fingers-row { display: flex; justify-content: center; gap: 6px; }
-        .f-dot {
-            width: 32px; height: 32px; border-radius: 50%;
-            background: var(--elevated); border: 1.5px solid var(--border);
-            display: grid; place-items: center;
-            font-family: var(--font-mono); font-size: 0.52rem; font-weight: 600; color: var(--text-3);
-            transition: all 200ms var(--ease);
-        }
-        .f-dot.on {
-            background: var(--accent-soft); border-color: var(--accent);
-            color: var(--accent);
-            box-shadow: 0 0 12px var(--accent-soft);
-        }
-        .f-labels { display: flex; justify-content: center; gap: 6px; margin-top: 4px; }
-        .f-labels span { width: 32px; text-align: center; font-family: var(--font-mono); font-size: 0.5rem; font-weight: 500; color: var(--text-3); }
-
-        /* Features compact */
-        .feat-section { padding: 14px 20px; border-bottom: 1px solid var(--border); }
-        .feat-row { display: flex; gap: 4px; flex-wrap: wrap; }
-        .feat-chip {
-            display: flex; align-items: center; gap: 4px;
-            padding: 4px 8px; border-radius: 5px;
-            background: var(--elevated);
-            font-family: var(--font-mono); font-size: 0.58rem; font-weight: 500;
-        }
-        .feat-chip .k { color: var(--text-3); }
-        .feat-chip .v { color: var(--accent); font-variant-numeric: tabular-nums; }
-        .face-chip { border: 1px solid rgba(167,139,250,0.2); }
-
-        /* ── Recordings ── */
-        .rec-section {
-            flex: 1;
-            display: flex; flex-direction: column;
-            overflow: hidden;
-        }
-        .rec-header {
-            padding: 14px 20px 10px;
-            display: flex; align-items: center; justify-content: space-between;
-            flex-shrink: 0;
-        }
-        .rec-title {
-            font-family: var(--font-mono); font-size: 0.58rem; font-weight: 500;
-            text-transform: uppercase; letter-spacing: 1px; color: var(--text-3);
-        }
-        .rec-count {
-            font-family: var(--font-mono); font-size: 0.58rem; font-weight: 500;
-            color: var(--accent); background: var(--accent-soft);
-            padding: 2px 7px; border-radius: 4px;
-        }
-        .rec-grid {
-            flex: 1;
-            overflow-y: auto;
-            padding: 0 16px 16px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 6px;
-            align-content: start;
-        }
-        .rec-card {
-            padding: 10px;
-            border-radius: 8px;
-            background: var(--elevated);
-            border: 1px solid transparent;
-            cursor: pointer;
-            transition: all 150ms var(--ease);
-        }
-        .rec-card:hover { background: var(--raised); border-color: var(--border); }
-        .rec-card.selected { background: var(--accent-soft); border-color: var(--accent-mid); }
-        .rec-card-gesture {
-            font-family: var(--font-display); font-size: 0.72rem; font-weight: 600;
-            color: var(--text); margin-bottom: 2px;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .rec-card-meta {
-            font-family: var(--font-mono); font-size: 0.52rem; font-weight: 500;
-            color: var(--text-3);
-        }
-        .rec-empty {
-            grid-column: 1 / -1;
-            padding: 24px 0;
-            text-align: center;
-            color: var(--text-3); font-size: 0.75rem;
-        }
-        .rec-actions {
-            padding: 0 16px 12px;
-            display: flex; gap: 6px;
-            flex-shrink: 0;
-        }
-        .rec-actions .btn { flex: 1; padding: 7px 10px; font-size: 0.7rem; }
-    </style>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 <div class="app">
@@ -334,9 +37,33 @@
         </div>
         <div class="header-right">
             <span class="fps-tag" id="fps-display">-- FPS</span>
-            <span class="ws-pill off" id="ws-badge"><span class="ws-dot off" id="ws-dot"></span><span id="ws-text">Offline</span></span>
+            <span class="ws-pill connecting" id="ws-badge"><span class="ws-dot connecting" id="ws-dot"></span><span id="ws-text">Connecting...</span></span>
+            <a href="https://github.com/richiekaroki/AIVirtualMouse" target="_blank" rel="noopener" class="github-link" title="View source on GitHub" aria-label="GitHub repository">
+                <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+            </a>
+            <button class="sound-btn" id="sound-btn" onclick="toggleSound()" title="Toggle gesture sounds" aria-label="Toggle sound">
+                <svg id="sound-icon-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                <svg id="sound-icon-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+            </button>
         </div>
     </header>
+
+    <div class="intro-banner" id="intro-banner">
+        <div class="intro-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 13"/>
+            </svg>
+        </div>
+        <div class="intro-content">
+            <div class="intro-title">Hand Motion — Real-Time Gesture Recognition</div>
+            <div class="intro-text">
+                Click <code>Start</code> and allow camera access to see live hand tracking with dual rule-based + ML classification. Your video stays in your browser — nothing is stored.
+            </div>
+        </div>
+        <button class="intro-dismiss" onclick="document.getElementById('intro-banner').classList.add('hidden')" aria-label="Dismiss">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+    </div>
 
     <div class="main" role="main">
         <!-- Camera -->
@@ -347,6 +74,19 @@
                 <div class="cam-overlay">
                     <span class="cam-tag tag-live" id="live-badge"><span class="blink"></span>LIVE</span>
                 </div>
+                <div class="cam-fps" id="cam-fps-overlay">-- FPS</div>
+                <div class="onboard-toast" id="onboard-toast">
+                    <div class="onboard-step" id="onboard-step">Step 1 of 3</div>
+                    <div class="onboard-gesture" id="onboard-gesture">🖐️</div>
+                    <div class="onboard-name" id="onboard-name">Open Hand</div>
+                    <div class="onboard-hint" id="onboard-hint">Spread all five fingers and hold your hand open</div>
+                    <div class="onboard-progress">
+                        <div class="onboard-dot active" id="ob-dot-0"></div>
+                        <div class="onboard-dot" id="ob-dot-1"></div>
+                        <div class="onboard-dot" id="ob-dot-2"></div>
+                    </div>
+                    <button class="onboard-skip" onclick="skipOnboarding()">Skip tour</button>
+                </div>
                 <div class="cam-empty" id="placeholder">
                     <div class="cam-empty-icon">
                         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -354,6 +94,20 @@
                         </svg>
                     </div>
                     <p class="cam-empty-text">Press <strong>Start</strong> to activate camera</p>
+                    <p style="font-size:0.65rem;color:var(--text-3);opacity:0.5;max-width:220px;text-align:center;line-height:1.4;">Grant camera permission when prompted. Your video is processed locally and never leaves your browser.</p>
+                </div>
+                <div class="cam-error" id="cam-error">
+                    <div class="cam-error-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                        </svg>
+                    </div>
+                    <div class="cam-error-title">Camera access denied</div>
+                    <div class="cam-error-msg" id="cam-error-msg">Please allow camera permission in your browser settings, then try again.</div>
+                    <button class="btn btn-accent" onclick="retryCamera()" style="margin-top:4px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                        Retry
+                    </button>
                 </div>
             </div>
             <div class="ctrl-row">
@@ -374,21 +128,39 @@
                     Rec
                 </button>
             </div>
+            <div class="gesture-strip">
+                <button class="gesture-strip-toggle" onclick="this.classList.toggle('open');const g=document.getElementById('gesture-strip-grid');g.classList.toggle('open');this.setAttribute('aria-expanded',g.classList.contains('open'))" aria-expanded="false" aria-controls="gesture-strip-grid">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    Try these gestures
+                </button>
+                <div class="gesture-strip-grid" id="gesture-strip-grid">
+                    <div class="gesture-chip"><span>&#x270B;</span> Open Hand</div>
+                    <div class="gesture-chip"><span>&#x270A;</span> Fist</div>
+                    <div class="gesture-chip"><span>&#x261D;</span> Point</div>
+                    <div class="gesture-chip"><span>&#x270C;</span> Peace</div>
+                    <div class="gesture-chip"><span>&#x1F44D;</span> Thumbs Up</div>
+                    <div class="gesture-chip"><span>&#x1F44C;</span> OK Sign</div>
+                    <div class="gesture-chip"><span>&#x1F44B;</span> Wave</div>
+                    <div class="gesture-chip"><span>&#x1F918;</span> Rock</div>
+                </div>
+            </div>
         </div>
 
         <!-- Right Panel -->
         <div class="panel">
             <div class="gesture-section">
-                <div class="gesture-word" id="gesture-name">--</div>
+                <div class="gesture-ring" id="gesture-ring"></div>
+                <div class="gesture-word idle" id="gesture-name">--</div>
                 <div class="gesture-meta">
                     <span id="gesture-conf"></span>
-                    <span class="hand-badge" id="handedness-badge">--</span>
+                    <span class="hand-badge idle" id="handedness-badge">--</span>
                 </div>
-                <div class="ml-row">
+                <div class="ml-row idle" id="ml-row" title="ML gesture prediction with confidence score">
                     <span class="ml-label">ML</span>
                     <span class="ml-value" id="ml-gesture-name">--</span>
                     <span class="ml-conf" id="ml-gesture-conf"></span>
                 </div>
+                <div style="margin-top:6px;font-family:var(--font-mono);font-size:0.52rem;color:var(--text-3);opacity:0.5;" id="ml-hint">Random Forest + Platt scaling &middot; from scratch</div>
                 <div class="second-hand" id="second-hand" style="display:none">
                     <span class="second-hand-label">2nd Hand</span>
                     <span class="hand-badge" id="handedness-badge-2">--</span>
@@ -398,25 +170,27 @@
             </div>
 
             <div class="fingers-section">
-                <div class="fingers-row" id="fingers-display"></div>
-                <div class="f-labels"><span>T</span><span>I</span><span>M</span><span>R</span><span>P</span></div>
+                <div class="fingers-row" id="fingers-display">
+                    <div class="f-dot idle">T</div><div class="f-dot idle">I</div><div class="f-dot idle">M</div><div class="f-dot idle">R</div><div class="f-dot idle">P</div>
+                </div>
+                <div class="f-labels"><span title="Thumb">T</span><span title="Index">I</span><span title="Middle">M</span><span title="Ring">R</span><span title="Pinky">P</span></div>
             </div>
 
             <div class="feat-section">
                 <div class="feat-row">
-                    <div class="feat-chip"><span class="k">Open</span><span class="v" id="f-open">--</span></div>
-                    <div class="feat-chip"><span class="k">Pinch</span><span class="v" id="f-pinch">--</span></div>
-                    <div class="feat-chip"><span class="k">Span</span><span class="v" id="f-span">--</span></div>
-                    <div class="feat-chip"><span class="k">Vel</span><span class="v" id="f-vel">--</span></div>
+                    <div class="feat-chip" data-tip="Hand openness (0–1)"><span class="k">Open</span><span class="v idle" id="f-open">--</span></div>
+                    <div class="feat-chip" data-tip="Thumb-index tip distance (px)"><span class="k">Pinch</span><span class="v idle" id="f-pinch">--</span></div>
+                    <div class="feat-chip" data-tip="Thumb-pinky span (px)"><span class="k">Span</span><span class="v idle" id="f-span">--</span></div>
+                    <div class="feat-chip" data-tip="Hand movement speed (px/s)"><span class="k">Vel</span><span class="v idle" id="f-vel">--</span></div>
                 </div>
             </div>
 
             <div class="feat-section" id="face-section" style="display:none">
                 <div class="feat-row">
-                    <div class="feat-chip face-chip"><span class="k">Face</span><span class="v" id="face-expr">--</span></div>
-                    <div class="feat-chip face-chip"><span class="k">Eyes</span><span class="v" id="face-eyes">--</span></div>
-                    <div class="feat-chip face-chip"><span class="k">Mouth</span><span class="v" id="face-mouth">--</span></div>
-                    <div class="feat-chip face-chip"><span class="k">Brow</span><span class="v" id="face-brow">--</span></div>
+                    <div class="feat-chip face-chip" data-tip="Facial expression"><span class="k">Face</span><span class="v" id="face-expr">--</span></div>
+                    <div class="feat-chip face-chip" data-tip="Eye state (open/closed)"><span class="k">Eyes</span><span class="v" id="face-eyes">--</span></div>
+                    <div class="feat-chip face-chip" data-tip="Mouth state (open/closed)"><span class="k">Mouth</span><span class="v" id="face-mouth">--</span></div>
+                    <div class="feat-chip face-chip" data-tip="Eyebrow position"><span class="k">Brow</span><span class="v" id="face-brow">--</span></div>
                 </div>
             </div>
 
@@ -425,7 +199,7 @@
                     <span class="rec-title">Library</span>
                     <span class="rec-count" id="rec-count">0</span>
                 </div>
-                <div class="rec-grid" id="rec-list"><div class="rec-empty">No recordings yet</div></div>
+                <div class="rec-grid" id="rec-list"><div class="rec-empty idle">Start camera and record gestures to build your library</div></div>
                 <div class="rec-actions">
                     <button class="btn btn-subtle" onclick="playSelected()" aria-label="Play selected recording">
                         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -436,231 +210,17 @@
                         Stop
                     </button>
                 </div>
+                </div>
+            </div>
+
+            <div class="session-stats">
+                <div class="stat"><span class="stat-dot"></span> Gestures <span class="stat-val" id="stat-gestures">0</span></div>
+                <div class="stat"><span class="stat-dot"></span> Session <span class="stat-val" id="stat-uptime">0:00</span></div>
             </div>
         </div>
-    </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js" crossorigin="anonymous" defer></script>
-<script>
-const VIDEO_FPS = 15, JPEG_QUALITY = 0.6, FRAME_INTERVAL = 1000 / VIDEO_FPS;
-let socket, localStream, videoEl, canvasEl, ctx, sendTimer, selectedRec = null;
-let frameCount = 0, lastFpsTime = Date.now(), fpsCounter = 0;
-let uniqueGestures = new Set();
-let isRecording = false, recordChunks = [];
-
-function initSocket() {
-    socket = io({ transports: ['polling', 'websocket'] });
-    socket.on('connect', () => { setWsStatus(true); loadRecordings(); });
-    socket.on('disconnect', () => setWsStatus(false));
-
-    socket.on('frame_result', d => {
-        if (ctx) ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-        if (d.hands && d.hands.length > 0) {
-            // Multi-hand rendering
-            d.hands.forEach(hand => {
-                if (hand.landmarks && hand.landmarks.length >= 42) {
-                    drawSkeleton(hand.landmarks, hand.hand_index);
-                }
-            });
-            // Primary hand displays in main UI
-            const primary = d.hands[0];
-            updateGesture(primary.gesture, primary.confidence);
-            updateMLGesture(primary.ml_gesture, primary.ml_confidence);
-            updateFingers(primary.fingers);
-            updateFeatures(primary.features, primary.velocity);
-            updateHandedness(primary.handedness);
-            // Second hand display
-            updateSecondHand(d.hands.length > 1 ? d.hands[1] : null);
-        } else if (d.landmarks && d.landmarks.length >= 42) {
-            // Fallback: single-hand format (playback or backward-compat)
-            drawSkeleton(d.landmarks);
-            updateGesture(d.gesture, d.confidence);
-            updateMLGesture(d.ml_gesture, d.ml_confidence);
-            updateFingers(d.fingers);
-            updateFeatures(d.features, d.velocity);
-            updateHandedness(d.handedness);
-            updateSecondHand(null);
-        } else {
-            clearOverlay(); updateGesture(null); updateMLGesture(null); updateFingers([]); updateHandedness(null); updateSecondHand(null);
-        }
-        // Non-manual markers (face)
-        updateFace(d.face);
-        fpsCounter++;
-        const now = Date.now();
-        if (now - lastFpsTime >= 1000) { document.getElementById('fps-display').textContent = fpsCounter + ' FPS'; fpsCounter = 0; lastFpsTime = now; }
-    });
-
-    socket.on('playback_frame', d => {
-        if (d.landmarks && d.landmarks.length >= 42) { drawSkeleton(d.landmarks); updateGesture(d.primitive); updateMLGesture(null); updateFingers(d.finger_states); if (d.features) updateFeatures(d.features, d.velocity); updateHandedness(d.handedness); }
-    });
-    socket.on('playback_finished', () => { clearOverlay(); updateGesture(null); updateHandedness(null); });
-}
-
-function setWsStatus(on) {
-    document.getElementById('ws-badge').className = 'ws-pill ' + (on ? 'on' : 'off');
-    document.getElementById('ws-dot').className = 'ws-dot ' + (on ? 'on' : 'off');
-    document.getElementById('ws-text').textContent = on ? 'Live' : 'Offline';
-}
-
-async function startCamera() {
-    try {
-        localStream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } });
-        videoEl = document.getElementById('local-video');
-        videoEl.srcObject = localStream; await videoEl.play();
-        canvasEl = document.getElementById('overlay-canvas');
-        canvasEl.width = videoEl.videoWidth || 640; canvasEl.height = videoEl.videoHeight || 480;
-        ctx = canvasEl.getContext('2d');
-        document.getElementById('placeholder').style.display = 'none';
-        document.getElementById('btn-start').disabled = true;
-        document.getElementById('btn-stop').disabled = false;
-        document.getElementById('btn-snapshot').disabled = false;
-        document.getElementById('btn-record').disabled = false;
-        document.getElementById('live-badge').style.display = '';
-        sendTimer = setInterval(captureAndSend, FRAME_INTERVAL);
-    } catch (e) { alert('Camera unavailable: ' + e.message); }
-}
-
-function stopCamera() {
-    if (sendTimer) clearInterval(sendTimer); sendTimer = null;
-    if (localStream) localStream.getTracks().forEach(t => t.stop()); localStream = null;
-    if (isRecording) toggleRecord();
-    clearOverlay();
-    document.getElementById('placeholder').style.display = '';
-    document.getElementById('btn-start').disabled = false;
-    document.getElementById('btn-stop').disabled = true;
-    document.getElementById('btn-snapshot').disabled = true;
-    document.getElementById('btn-record').disabled = true;
-    document.getElementById('live-badge').style.display = 'none';
-    document.getElementById('fps-display').textContent = '-- FPS';
-}
-
-function captureAndSend() {
-    if (!videoEl || !localStream || !socket || !socket.connected || videoEl.readyState < 2) return;
-    const w = videoEl.videoWidth || 640, h = videoEl.videoHeight || 480;
-    const c = document.createElement('canvas'); c.width = w; c.height = h;
-    c.getContext('2d').drawImage(videoEl, 0, 0, w, h);
-    frameCount++;
-    socket.emit('process_frame', { image: c.toDataURL('image/jpeg', JPEG_QUALITY).split(',')[1], width: w, height: h, client_ts: Date.now(), frame_num: frameCount });
-}
-
-function drawSkeleton(lm, handIdx = 0) {
-    if (!ctx || !canvasEl) return;
-    const sx = canvasEl.width / 640, sy = canvasEl.height / 480;
-    const conns = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
-    const colors = [
-        { line: 'rgba(245,158,11,0.6)', tip: '#F59E0B', joint: '#E8E8EC' },
-        { line: 'rgba(167,139,250,0.6)', tip: '#A78BFA', joint: '#C4B5FD' },
-    ];
-    const c = colors[handIdx % colors.length];
-    ctx.strokeStyle = c.line; ctx.lineWidth = 2; ctx.lineJoin = 'round';
-    for (const [a, b] of conns) { ctx.beginPath(); ctx.moveTo(lm[a*2]*sx, lm[a*2+1]*sy); ctx.lineTo(lm[b*2]*sx, lm[b*2+1]*sy); ctx.stroke(); }
-    for (let i = 0; i < 21; i++) {
-        const x = lm[i*2]*sx, y = lm[i*2+1]*sy, tip = [4,8,12,16,20].includes(i);
-        ctx.fillStyle = tip ? c.tip : c.joint;
-        ctx.beginPath(); ctx.arc(x, y, tip ? 4 : 2.5, 0, Math.PI*2); ctx.fill();
-    }
-}
-
-function clearOverlay() { if (ctx) ctx.clearRect(0, 0, canvasEl.width, canvasEl.height); }
-
-function updateGesture(name) {
-    const el = document.getElementById('gesture-name'), cf = document.getElementById('gesture-conf');
-    if (!name) { el.textContent = '--'; el.classList.remove('active'); cf.textContent = ''; return; }
-    el.textContent = name.replace(/_/g, ' '); el.classList.add('active'); cf.textContent = 'rule-based';
-}
-
-function updateMLGesture(name, conf) {
-    const el = document.getElementById('ml-gesture-name'), cf = document.getElementById('ml-gesture-conf');
-    if (!name) { el.textContent = '--'; cf.textContent = ''; return; }
-    el.textContent = name.replace(/_/g, ' ');
-    cf.textContent = conf != null ? Math.round(conf * 100) + '%' : '';
-}
-
-function updateFingers(f) {
-    const el = document.getElementById('fingers-display'), L = ['T','I','M','R','P'];
-    if (!f || !f.length) { el.innerHTML = L.map(l => `<div class="f-dot">${l}</div>`).join(''); return; }
-    el.innerHTML = f.map((v, i) => `<div class="f-dot ${v ? 'on' : ''}">${L[i]}</div>`).join('');
-}
-
-function updateFeatures(f, v) {
-    if (!f) return;
-    document.getElementById('f-open').textContent = f.hand_openness != null ? f.hand_openness.toFixed(2) : '--';
-    document.getElementById('f-pinch').textContent = f.pinch_distance != null ? Math.round(f.pinch_distance) : '--';
-    document.getElementById('f-span').textContent = f.hand_span != null ? Math.round(f.hand_span) : '--';
-    if (v) document.getElementById('f-vel').textContent = v.magnitude != null ? Math.round(v.magnitude) : '--';
-}
-
-function updateHandedness(h) {
-    const el = document.getElementById('handedness-badge');
-    if (!h || h === 'Unknown') { el.textContent = '--'; el.className = 'hand-badge'; return; }
-    el.textContent = h;
-    el.className = 'hand-badge ' + h.toLowerCase();
-}
-
-function updateSecondHand(hand) {
-    const el = document.getElementById('second-hand');
-    if (!hand) { el.style.display = 'none'; return; }
-    el.style.display = '';
-    const badge = document.getElementById('handedness-badge-2');
-    const name = document.getElementById('gesture-name-2');
-    const conf = document.getElementById('ml-gesture-conf-2');
-    if (hand.handedness && hand.handedness !== 'Unknown') {
-        badge.textContent = hand.handedness;
-        badge.className = 'hand-badge ' + hand.handedness.toLowerCase();
-    } else { badge.textContent = '--'; badge.className = 'hand-badge'; }
-    name.textContent = hand.ml_gesture ? hand.ml_gesture.replace(/_/g, ' ') : (hand.gesture ? hand.gesture.replace(/_/g, ' ') : '--');
-    conf.textContent = hand.ml_confidence ? Math.round(hand.ml_confidence * 100) + '%' : '';
-}
-
-function updateFace(face) {
-    const section = document.getElementById('face-section');
-    if (!face) { section.style.display = 'none'; return; }
-    section.style.display = '';
-    document.getElementById('face-expr').textContent = face.expression || 'neutral';
-    document.getElementById('face-eyes').textContent = face.eyes_open ? 'open' : 'closed';
-    document.getElementById('face-mouth').textContent = face.mouth_open ? 'open' : 'closed';
-    document.getElementById('face-brow').textContent = face.eyebrows_raised ? 'raised' : 'neutral';
-}
-
-function toggleRecord() {
-    isRecording = !isRecording;
-    const btn = document.getElementById('btn-record');
-    if (isRecording) { btn.classList.add('btn-record'); btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Stop'; }
-    else { btn.classList.remove('btn-record'); btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg> Rec'; }
-}
-
-function takeSnapshot() {
-    if (!videoEl || !localStream) return;
-    const c = document.createElement('canvas'); c.width = videoEl.videoWidth; c.height = videoEl.videoHeight;
-    c.getContext('2d').drawImage(videoEl, 0, 0);
-    const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = 'capture_' + Date.now() + '.png'; a.click();
-}
-
-const GESTURE_ICONS = {
-    POINT:'\u261D', OPEN_HAND:'\u270B', FIST:'\u270A', PEACE_V:'\u270C', THUMBS_UP:'\u{1F44D}',
-    PINCH:'\u{1F90F}', OK_SIGN:'\u{1F44C}', WAVE:'\u{1F44B}', CIRCLE:'\u{2B55}', GRAB:'\u{1F91F}',
-    PUSH:'\u{1F446}', SWIPE_LEFT:'\u{2B05}', SWIPE_RIGHT:'\u{27A1}', THREE:'\u{1F446}', FOUR:'\u{1F44F}',
-    PINKY:'\u{1F91E}', GUN:'\u{1F52B}', SPIDER:'\u{1F577}', ROCK:'\u{1F918}', SHAKA:'\u{1F44F}',
-};
-
-function selectRec(el, f) { document.querySelectorAll('.rec-card').forEach(e => e.classList.remove('selected')); el.classList.add('selected'); selectedRec = f; }
-function playSelected() { if (!selectedRec || !socket || !socket.connected) return; socket.emit('play_recording', { filename: selectedRec, speed: 1.0 }); }
-function stopPlayback() { if (socket) socket.emit('stop_playback'); }
-
-async function loadRecordings() {
-    try {
-        const r = await fetch('/api/recordings'), d = await r.json(), el = document.getElementById('rec-list');
-        document.getElementById('rec-count').textContent = d.count;
-        if (!d.recordings.length) { el.innerHTML = '<div class="rec-empty">No recordings yet</div>'; return; }
-        el.innerHTML = d.recordings.map(r => {
-            const icon = GESTURE_ICONS[r.gesture.toUpperCase()] || '\u{1F590}';
-            return `<div class="rec-card" onclick="selectRec(this,'${r.filename}')" data-file="${r.filename}"><div class="rec-card-gesture">${icon} ${r.gesture}</div><div class="rec-card-meta">${r.frames}f \u00B7 ${r.duration.toFixed(1)}s</div></div>`;
-        }).join('');
-    } catch(e) {}
-}
-
-window.addEventListener('load', () => { initSocket(); loadRecordings(); updateFingers([]); });
-</script>
+<script src="/static/app.js" defer></script>
 </body>
 </html>
