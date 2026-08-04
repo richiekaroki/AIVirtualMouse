@@ -10,7 +10,7 @@ from hand_motion.detection import HandDetector, handDetector
 class TestHandDetectorInit:
     def test_default_init(self):
         detector = HandDetector()
-        assert detector.mode is False
+        assert detector.mode is True
         assert detector.maxHands == 2
         assert detector.detectionCon == 0.5
         assert detector.trackCon == 0.5

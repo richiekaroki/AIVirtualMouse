@@ -11,14 +11,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY requirements-web.txt .
-RUN pip install --no-cache-dir -r requirements-web.txt
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ src/
 COPY motion_data/ motion_data/
+COPY models/ models/
 COPY wsgi.py .
 
-RUN mkdir -p motion_data
+RUN mkdir -p motion_data models
 
 ENV TF_CPP_MIN_LOG_LEVEL=3
 ENV PYTHONUNBUFFERED=1

@@ -13,4 +13,4 @@ build/
 .vscode/
 *.md
 !README.md
-motion_data/*.json
+!docs/

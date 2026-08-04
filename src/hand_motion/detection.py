@@ -40,7 +40,7 @@ class HandDetector:
 
     def __init__(
         self,
-        mode: bool = False,
+        mode: bool = True,
         maxHands: int = 2,
         detectionCon: float = 0.5,
         trackCon: float = 0.5
@@ -49,7 +49,9 @@ class HandDetector:
         Initialize hand detector.
 
         Args:
-            mode: Static image mode (True) or video mode (False)
+            mode: Static image mode (True) or video mode (False).
+                  True treats each frame independently (no timestamp dependency).
+                  False requires monotonically increasing timestamps.
             maxHands: Maximum number of hands to detect (1-2)
             detectionCon: Detection confidence threshold (0.0-1.0)
             trackCon: Tracking confidence threshold (0.0-1.0)
@@ -60,6 +62,7 @@ class HandDetector:
         self.trackCon = trackCon
 
         self.detector = CvzoneHandDetector(
+            staticMode=mode,
             detectionCon=detectionCon,
             maxHands=maxHands
         )

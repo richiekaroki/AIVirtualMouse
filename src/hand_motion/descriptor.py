@@ -14,17 +14,57 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-# Primitive classification constants
+# Primitive classification constants — covers all 32 finger combos
+# Format: (thumb, index, middle, ring, pinky)
 PRIMITIVE_MAP: Dict[Tuple[int, ...], str] = {
+    # 0 fingers
+    (0, 0, 0, 0, 0): "FIST",
+    # 1 finger
     (0, 1, 0, 0, 0): "POINT",
-    (0, 1, 1, 0, 0): "PEACE_V",
-    (1, 1, 1, 1, 1): "OPEN_HAND",
-    (1, 0, 0, 0, 0): "THUMBS_UP",
-    (1, 1, 0, 0, 0): "PINCH_READY",  # May be OK_SIGN based on pinch distance
-    (0, 1, 1, 1, 0): "THREE",
-    (0, 1, 1, 1, 1): "FOUR",
+    (0, 0, 1, 0, 0): "MIDDLE_POINT",
+    (0, 0, 0, 1, 0): "RING_ONLY",
     (0, 0, 0, 0, 1): "PINKY",
+    (1, 0, 0, 0, 0): "THUMBS_UP",
+    # 2 fingers
+    (0, 1, 1, 0, 0): "PEACE_V",
+    (0, 1, 0, 1, 0): "ROCK",
+    (0, 1, 0, 0, 1): "SHAKA",
+    (0, 0, 1, 1, 0): "TWO_MID_RING",
+    (0, 0, 1, 0, 1): "TWO_MID_PINKY",
+    (0, 0, 0, 1, 1): "TWO_RING_PINKY",
+    (1, 1, 0, 0, 0): "GUN",
+    (1, 0, 1, 0, 0): "THUMB_MIDDLE",
+    (1, 0, 0, 1, 0): "THUMB_RING",
+    (1, 0, 0, 0, 1): "CALL_ME",
+    # 3 fingers
+    (0, 1, 1, 1, 0): "THREE",
+    (0, 1, 1, 0, 1): "THREE_SPREAD",
+    (0, 1, 0, 1, 1): "W3",
+    (0, 0, 1, 1, 1): "THREE_MID",
+    (1, 1, 1, 0, 0): "THUMB_THREE",
+    (1, 1, 0, 1, 0): "THUMB_ROCK",
+    (1, 0, 1, 1, 0): "FORK",
+    (1, 0, 1, 0, 1): "SPIDER",
+    (1, 0, 0, 1, 1): "YAW",
+    (1, 1, 0, 0, 1): "L_SHAPE",
+    # 4 fingers
+    (0, 1, 1, 1, 1): "FOUR",
+    (1, 1, 1, 1, 0): "FOUR_NO_PINKY",
+    (1, 1, 1, 0, 1): "FOUR_NO_RING",
+    (1, 1, 0, 1, 1): "FOUR_NO_MIDDLE",
+    (1, 0, 1, 1, 1): "FOUR_NO_INDEX",
+    # 5 fingers
+    (1, 1, 1, 1, 1): "OPEN_HAND",
 }
+
+# Motion detection thresholds
+MOTION_WINDOW = 15  # frames to analyze for motion patterns
+CIRCLE_MIN_FRAMES = 10
+CIRCLE_MIN_RADIUS = 30  # pixels
+SWIPE_MIN_DISTANCE = 100  # pixels
+SWIPE_MIN_FRAMES = 4
+WAVE_MIN_DIR_CHANGES = 3
+WAVE_MIN_FRAMES = 8
 
 # Hand landmark indices
 WRIST = 0
@@ -110,6 +150,7 @@ class MotionDescriptor:
                 'palm_center': self._calculate_palm_center(lmList),
             },
             'primitive': self._classify_primitive(fingers, lmList),
+            'confidence': self._calculate_confidence(fingers, lmList),
             'velocity': self._calculate_velocity(lmList) if len(self.motion_history) > 0 else None,
         }
 
@@ -213,6 +254,34 @@ class MotionDescriptor:
             'y': (wrist_y + middle_base_y) / 2
         }
 
+    def _calculate_confidence(self, fingers: List[int], lmList: List[List[float]]) -> float:
+        """
+        Calculate a heuristic confidence score for the current gesture.
+
+        Based on how clearly the finger states match and landmark stability.
+        Returns a value between 0.0 and 1.0.
+        """
+        if not fingers or len(lmList) < 21:
+            return 0.0
+
+        extended = sum(fingers)
+        if extended == 0 or extended == 5:
+            base = 0.9
+        elif extended in (1, 4):
+            base = 0.85
+        else:
+            base = 0.75
+
+        wrist = lmList[WRIST]
+        middle_base = lmList[MIDDLE_BASE]
+        spread = math.hypot(middle_base[1] - wrist[1], middle_base[2] - wrist[2])
+        if spread < 20:
+            base *= 0.7
+        elif spread > 100:
+            base = min(base * 1.05, 1.0)
+
+        return round(base, 3)
+
     def _calculate_velocity(self, lmList: List[List[float]]) -> Optional[Dict[str, float]]:
         """
         Calculate velocity of index finger tip since last frame.
@@ -252,6 +321,7 @@ class MotionDescriptor:
     def _classify_primitive(self, fingers: List[int], lmList: List[List[float]]) -> str:
         """
         Classify hand configuration into gesture primitive.
+        Uses finger states for static gestures + velocity history for motion gestures.
 
         Args:
             fingers: List of 5 binary values
@@ -260,21 +330,131 @@ class MotionDescriptor:
         Returns:
             String name of the classified primitive
         """
-        # Handle special case for FIST (all fingers down)
-        if sum(fingers) == 0:
-            return "FIST"
+        # 1) Check for motion-based gestures first (they override static)
+        motion_gesture = self._detect_motion_gesture(lmList)
+        if motion_gesture:
+            return motion_gesture
 
-        # Check lookup table first
+        # 2) Check for PINCH (thumb + index close)
+        pinch_dist = self._calculate_pinch(lmList)
+        finger_count = sum(fingers)
+
+        if fingers[0] == 1 and fingers[1] == 1 and finger_count == 2:
+            return "OK_SIGN" if pinch_dist < 40 else "GUN"
+
+        if fingers[0] == 1 and fingers[1] == 1 and finger_count == 3 and fingers[2] == 0:
+            return "SPIDER" if pinch_dist < 50 else "GUN"
+
+        # 3) Check for THUMBS_UP with angle validation
+        if fingers == [1, 0, 0, 0, 0]:
+            if self._is_thumb_up(lmList):
+                return "THUMBS_UP"
+
+        # 4) Lookup table for all other combos
         fingers_tuple = tuple(fingers)
         if fingers_tuple in PRIMITIVE_MAP:
-            primitive = PRIMITIVE_MAP[fingers_tuple]
-            # Special handling for PINCH_READY vs OK_SIGN
-            if primitive == "PINCH_READY":
-                pinch_dist = self._calculate_pinch(lmList)
-                return "OK_SIGN" if pinch_dist < 40 else "PINCH_READY"
-            return primitive
+            return PRIMITIVE_MAP[fingers_tuple]
 
         return f"UNKNOWN_{self._encode_handshape(fingers)}"
+
+    def _is_thumb_up(self, lmList: List[List[float]]) -> bool:
+        """Check if thumb is pointing upward (not sideways)."""
+        if len(lmList) < 5:
+            return False
+        thumb_tip_y = lmList[THUMB_TIP][2]
+        thumb_ip_y = lmList[3][2]  # Thumb IP joint
+        wrist_y = lmList[WRIST][2]
+        # Thumb tip should be significantly above thumb IP joint
+        return thumb_tip_y < thumb_ip_y - 15
+
+    def _detect_motion_gesture(self, lmList: List[List[float]]) -> Optional[str]:
+        """
+        Detect motion-based gestures from velocity/position history.
+        Analyzes the last N frames to detect CIRCLE, WAVE, SWIPE patterns.
+        """
+        if len(self.motion_history) < MOTION_WINDOW:
+            return None
+
+        recent = self.motion_history[-MOTION_WINDOW:]
+        wrist_positions = [(m['landmarks']['wrist']['x'], m['landmarks']['wrist']['y']) for m in recent]
+        index_positions = [(m['landmarks']['index_tip']['x'], m['landmarks']['index_tip']['y']) for m in recent]
+
+        # Use index tip for most gestures (more expressive than wrist)
+        positions = index_positions
+
+        # Detect CIRCLE: points form a rough circle
+        circle = self._detect_circle(positions)
+        if circle:
+            return "CIRCLE"
+
+        # Detect WAVE: rapid left-right oscillation
+        wave = self._detect_wave(wrist_positions)
+        if wave:
+            return "WAVE"
+
+        # Detect SWIPE: large unidirectional movement
+        swipe = self._detect_swipe(positions)
+        if swipe:
+            return swipe
+
+        return None
+
+    def _detect_circle(self, positions: List[Tuple[float, float]]) -> bool:
+        """Detect if positions form a circular pattern."""
+        if len(positions) < CIRCLE_MIN_FRAMES:
+            return False
+
+        # Calculate centroid
+        cx = sum(p[0] for p in positions) / len(positions)
+        cy = sum(p[1] for p in positions) / len(positions)
+
+        # Calculate average radius
+        radii = [math.hypot(p[0] - cx, p[1] - cy) for p in positions]
+        avg_radius = sum(radii) / len(radii)
+
+        if avg_radius < CIRCLE_MIN_RADIUS:
+            return False
+
+        # Check if points are roughly equidistant from center (low variance)
+        variance = sum((r - avg_radius) ** 2 for r in radii) / len(radii)
+        # Also check that points go around (angular spread)
+        angles = [math.atan2(p[1] - cy, p[0] - cx) for p in positions]
+        angle_range = max(angles) - min(angles)
+
+        # Low variance + large angle spread = circle
+        return variance < (avg_radius * 0.6) ** 2 and angle_range > 3.0
+
+    def _detect_wave(self, positions: List[Tuple[float, float]]) -> bool:
+        """Detect oscillating left-right motion (wave)."""
+        if len(positions) < WAVE_MIN_FRAMES:
+            return False
+
+        # Count direction changes along X axis
+        dir_changes = 0
+        for i in range(2, len(positions)):
+            dx_prev = positions[i-1][0] - positions[i-2][0]
+            dx_curr = positions[i][0] - positions[i-1][0]
+            if dx_prev * dx_curr < 0 and abs(dx_curr) > 3:
+                dir_changes += 1
+
+        # Check total X displacement is significant
+        total_dx = abs(positions[-1][0] - positions[0][0])
+
+        return dir_changes >= WAVE_MIN_DIR_CHANGES and total_dx > 40
+
+    def _detect_swipe(self, positions: List[Tuple[float, float]]) -> Optional[str]:
+        """Detect unidirectional swipe movement."""
+        if len(positions) < SWIPE_MIN_FRAMES:
+            return None
+
+        total_dx = positions[-1][0] - positions[0][0]
+        total_dy = positions[-1][1] - positions[0][1]
+
+        # Check if movement is primarily horizontal or vertical
+        if abs(total_dx) > SWIPE_MIN_DISTANCE and abs(total_dx) > abs(total_dy) * 2:
+            return "SWIPE_LEFT" if total_dx < 0 else "SWIPE_RIGHT"
+
+        return None
 
     def _normalize_coordinates(
         self,

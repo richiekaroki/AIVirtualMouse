@@ -22,6 +22,7 @@
             <a href="#architecture">Architecture</a>
             <a href="#demo">Demo</a>
             <a href="#roadmap">Roadmap</a>
+            <a href="https://hand-motion-pipeline.onrender.com" class="nav-btn" target="_blank">Live Demo</a>
             <a href="https://github.com/richiekaroki/AIVirtualMouse" class="nav-btn" target="_blank">GitHub</a>
         </div>
     </div>
@@ -29,7 +30,7 @@
 
 <header class="hero">
     <div class="hero-container">
-        <div class="hero-badge">Active Development &middot; v0.6.0</div>
+        <div class="hero-badge">Active Development &middot; v0.8.0</div>
         <h1 class="hero-title">
             Hand Motion<br>
             <span class="gradient-text">Interpretation Pipeline</span>
@@ -40,8 +41,8 @@
             Treats hand gestures as <strong>structured linguistic data</strong>, not just visual input.
         </p>
         <div class="hero-actions">
-            <a href="https://github.com/richiekaroki/AIVirtualMouse#quick-start" class="btn btn-primary" target="_blank">Get Started</a>
-            <a href="#architecture" class="btn btn-secondary">View Architecture</a>
+            <a href="https://hand-motion-pipeline.onrender.com" class="btn btn-primary" target="_blank">Try Live Demo</a>
+            <a href="https://github.com/richiekaroki/AIVirtualMouse#quick-start" class="btn btn-secondary" target="_blank">Get Started</a>
         </div>
         <div class="hero-stats">
             <div class="stat">
@@ -49,16 +50,16 @@
                 <span class="stat-label">Hand Landmarks</span>
             </div>
             <div class="stat">
-                <span class="stat-value">30</span>
-                <span class="stat-label">FPS Capture</span>
+                <span class="stat-value">32</span>
+                <span class="stat-label">Gesture Primitives</span>
             </div>
             <div class="stat">
-                <span class="stat-value">45</span>
-                <span class="stat-label">Recordings</span>
+                <span class="stat-value">142</span>
+                <span class="stat-label">Tests Passing</span>
             </div>
             <div class="stat">
-                <span class="stat-value">4</span>
-                <span class="stat-label">Output Targets</span>
+                <span class="stat-value">15</span>
+                <span class="stat-label">Sample Recordings</span>
             </div>
         </div>
     </div>
@@ -72,18 +73,18 @@
         <div class="features-grid">
             <div class="feature-card">
                 <div class="feature-icon">&#127909;</div>
-                <h3>Real-Time Motion Capture</h3>
-                <p>21-point hand tracking at 30 FPS using MediaPipe. Coordinate normalization for cross-device consistency.</p>
+                <h3>Browser Webcam Support</h3>
+                <p>Real-time gesture recognition via WebSocket — no installation required. Works on any device with a camera.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon">&#129504;</div>
-                <h3>Motion Descriptor Abstraction</h3>
-                <p>Converts raw landmarks into structured data: handshape, location, velocity, and gesture primitives.</p>
+                <h3>Dual Gesture Classification</h3>
+                <p>Rule-based (32 finger combinations) + ML-based (RandomForest, 15 gestures) running simultaneously.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon">&#128190;</div>
-                <h3>JSON Data Pipeline</h3>
-                <p>Export motion sequences with metadata, timestamps, and quality metrics for ML training and analysis.</p>
+                <h3>Motion Detection</h3>
+                <p>Circle, wave, and swipe recognition from position history. Structured JSON export for ML training.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon">&#128200;</div>
@@ -92,13 +93,13 @@
             </div>
             <div class="feature-card">
                 <div class="feature-icon">&#127912;</div>
-                <h3>Professional UI</h3>
-                <p>Split-screen interface with live skeleton overlay, recording controls, and session statistics.</p>
+                <h3>Web UI</h3>
+                <p>Responsive split-screen layout with live skeleton overlay, recording library, and session statistics.</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">&#128256;</div>
-                <h3>Cursor Control</h3>
-                <p>Gesture-based mouse control: index finger moves cursor, pinch gestures click. Accessibility first.</p>
+                <div class="feature-icon">&#9729;&#65039;</div>
+                <h3>Render Deployment</h3>
+                <p>One-click deploy with Docker + gunicorn. HTTPS enabled for secure webcam access.</p>
             </div>
         </div>
     </div>
@@ -135,20 +136,20 @@
             <div class="arch-arrow">&darr;</div>
             <div class="arch-outputs">
                 <div class="arch-box arch-output">
-                    <div class="arch-label">Cursor Control</div>
-                    <div class="arch-detail">PyAutoGUI</div>
+                    <div class="arch-label">Web Interface</div>
+                    <div class="arch-detail">Flask + SocketIO</div>
+                </div>
+                <div class="arch-box arch-output">
+                    <div class="arch-label">ML Classifier</div>
+                    <div class="arch-detail">RandomForest</div>
                 </div>
                 <div class="arch-box arch-output">
                     <div class="arch-label">JSON Export</div>
                     <div class="arch-detail">Training data</div>
                 </div>
                 <div class="arch-box arch-output">
-                    <div class="arch-label">Visualization</div>
-                    <div class="arch-detail">Matplotlib plots</div>
-                </div>
-                <div class="arch-box arch-output">
                     <div class="arch-label">Animation</div>
-                    <div class="arch-detail">Future: 3D rigs</div>
+                    <div class="arch-detail">3D rigs</div>
                 </div>
             </div>
         </div>
@@ -164,31 +165,31 @@
             <div class="demo-card">
                 <div class="demo-step">1</div>
                 <h3>Capture</h3>
-                <p>Webcam feed is processed by MediaPipe to extract 21 hand landmarks in real-time. The enhanced UI shows a live skeleton overlay.</p>
+                <p>Browser webcam feed is processed by MediaPipe to extract 21 hand landmarks in real-time via WebSocket.</p>
                 <div class="demo-code">
-                    <code>python -m hand_motion.apps.cursor_enhanced</code>
+                    <code>python -m hand_motion.web.app</code>
                 </div>
             </div>
             <div class="demo-card">
                 <div class="demo-step">2</div>
-                <h3>Analyze</h3>
-                <p>MotionDescriptor converts landmarks into structured data: handshape codes, gesture primitives, velocity vectors, and normalized coordinates.</p>
+                <h3>Classify</h3>
+                <p>Dual classification: rule-based (32 finger combos) + ML-based (RandomForest) run simultaneously.</p>
                 <div class="demo-code">
-                    <code>primitive: POINT &middot; openness: 0.20 &middot; vel: 45.2 px/s</code>
+                    <code>primitive: POINT &middot; ml: OPEN_HAND &middot; conf: 0.87</code>
                 </div>
             </div>
             <div class="demo-card">
                 <div class="demo-step">3</div>
                 <h3>Record</h3>
-                <p>Press R to start recording. Motion sequences are captured with timestamps and exported as structured JSON files.</p>
+                <p>Save gesture sequences with timestamps. 15 sample recordings included for testing.</p>
                 <div class="demo-code">
-                    <code>gesture_wave_1735814400.json &middot; 75 frames &middot; 2.5s</code>
+                    <code>wave_sample.json &middot; 60 frames &middot; 2.0s</code>
                 </div>
             </div>
             <div class="demo-card">
                 <div class="demo-step">4</div>
-                <h3>Analyze Offline</h3>
-                <p>Use MotionAnalyzer to generate trajectory plots, velocity profiles, and primitive timelines from recorded data.</p>
+                <h3>Analyze</h3>
+                <p>Generate trajectory plots, velocity profiles, and primitive timelines from recorded data.</p>
                 <div class="demo-code">
                     <code>python -m hand_motion.analyzer gesture.json --plot all</code>
                 </div>
@@ -373,8 +374,8 @@
             <h2>Built for Accessibility &amp; Linguistic Preservation</h2>
             <p>Open source, contributions welcome &mdash; especially from the deaf community, sign language researchers, and accessibility technologists.</p>
             <div class="cta-actions">
-                <a href="https://github.com/richiekaroki/AIVirtualMouse" class="btn btn-primary" target="_blank">View on GitHub</a>
-                <a href="https://github.com/richiekaroki/AIVirtualMouse#contributing" class="btn btn-secondary" target="_blank">Contribute</a>
+                <a href="https://hand-motion-pipeline.onrender.com" class="btn btn-primary" target="_blank">Try Live Demo</a>
+                <a href="https://github.com/richiekaroki/AIVirtualMouse" class="btn btn-secondary" target="_blank">View on GitHub</a>
             </div>
         </div>
     </div>

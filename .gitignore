@@ -47,13 +47,14 @@ htmlcov/
 .env
 .env.local
 
-# Project-specific
-motion_data/*.json
-analysis_plots/*.png
+# Generated outputs
+analysis_plots/
+server.log
 dataset_summary.md
-*.pyc
-*.task
 
 # Build artifacts
 *.spec
 *.pyd
+
+# Keep ML model in models/
+!models/hand_landmarker.task

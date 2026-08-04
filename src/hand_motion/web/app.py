@@ -32,10 +32,13 @@ socketio = SocketIO(cors_allowed_origins="*", async_mode="threading")
 def create_app(
     static_folder: str = None,
     template_folder: str = None,
-    data_dir: str = "motion_data",
+    data_dir: str = None,
 ) -> Flask:
     """Create Flask application with SocketIO."""
     base_dir = Path(__file__).parent
+    project_root = base_dir.parent.parent.parent
+    if data_dir is None:
+        data_dir = str(project_root / "motion_data")
     if static_folder is None:
         static_folder = str(base_dir / "static")
     if template_folder is None:
@@ -172,6 +175,7 @@ _camera_streams: Dict[str, Dict[str, Any]] = {}
 # Lazily initialized detectors per-thread
 _detector = None
 _descriptor = None
+_classifier = None
 _server_frame_counter = 0
 _mediapipe_lock = threading.Lock()
 
@@ -189,13 +193,20 @@ class _Suppress_stderr:
 
 
 def _get_detector():
-    global _detector, _descriptor
+    global _detector, _descriptor, _classifier
     if _detector is None:
         from hand_motion.detection import HandDetector
         from hand_motion.descriptor import MotionDescriptor
         _detector = HandDetector(detectionCon=0.7)
         _descriptor = MotionDescriptor()
-    return _detector, _descriptor
+    if _classifier is None:
+        from hand_motion.ai.landmark_classifier import LandmarkClassifier
+        _classifier = LandmarkClassifier()
+        if not _classifier.is_trained:
+            data_dir = Path(__file__).parent.parent.parent.parent / "motion_data"
+            _classifier.train_from_directory(str(data_dir))
+            _classifier.save_model()
+    return _detector, _descriptor, _classifier
 
 
 def register_socket_handlers(app: Flask) -> None:
@@ -239,7 +250,7 @@ def register_socket_handlers(app: Flask) -> None:
                 emit("frame_result", {"error": "Failed to decode image"})
                 return
 
-            detector, descriptor = _get_detector()
+            detector, descriptor, classifier = _get_detector()
 
             img = cv2.flip(img, 1)
             with _mediapipe_lock:
@@ -259,6 +270,8 @@ def register_socket_handlers(app: Flask) -> None:
                 "fingers": [],
                 "features": None,
                 "velocity": None,
+                "ml_gesture": None,
+                "ml_confidence": 0,
             }
 
             if lm_list and len(lm_list) != 0:
@@ -271,12 +284,22 @@ def register_socket_handlers(app: Flask) -> None:
 
                 last_desc = descriptor.motion_history[-1] if descriptor.motion_history else None
 
+                # Rule-based gesture from descriptor
+                rule_gesture = last_desc["primitive"] if last_desc else None
+                rule_conf = last_desc.get("confidence", 0) if last_desc else 0
+
+                # ML-based gesture from classifier
+                ml_result = classifier.predict(lm_list)
+
                 result.update({
                     "landmarks": flat,
                     "fingers": fingers,
-                    "gesture": last_desc["primitive"] if last_desc else None,
+                    "gesture": rule_gesture,
+                    "confidence": rule_conf,
                     "features": last_desc["features"] if last_desc else None,
                     "velocity": last_desc["velocity"] if last_desc else None,
+                    "ml_gesture": ml_result.get("gesture"),
+                    "ml_confidence": ml_result.get("confidence", 0),
                 })
 
             emit("frame_result", result)
@@ -311,7 +334,7 @@ def register_socket_handlers(app: Flask) -> None:
                     socketio.emit("camera_error", {"error": f"Cannot open camera {camera_index}"}, room=sid)
                     return
 
-                detector, descriptor = _get_detector()
+                detector, descriptor, classifier = _get_detector()
 
                 socketio.emit("camera_started", {"width": width, "height": height}, room=sid)
 
@@ -331,6 +354,8 @@ def register_socket_handlers(app: Flask) -> None:
                         "frame": frame_count,
                         "timestamp": time.time(),
                         "hands_detected": bool(lm_list and len(lm_list) > 0),
+                        "ml_gesture": None,
+                        "ml_confidence": 0,
                     }
 
                     if lm_list and len(lm_list) != 0:
@@ -343,6 +368,9 @@ def register_socket_handlers(app: Flask) -> None:
 
                         last_desc = descriptor.motion_history[-1] if descriptor.motion_history else None
 
+                        # ML prediction
+                        ml_result = classifier.predict(lm_list)
+
                         gesture_data.update({
                             "landmarks": landmarks_flat,
                             "fingers": fingers,
@@ -350,6 +378,8 @@ def register_socket_handlers(app: Flask) -> None:
                             "gesture": last_desc["primitive"] if last_desc else None,
                             "features": last_desc["features"] if last_desc else None,
                             "velocity": last_desc["velocity"] if last_desc else None,
+                            "ml_gesture": ml_result.get("gesture"),
+                            "ml_confidence": ml_result.get("confidence", 0),
                         })
 
                         _, img_encoded = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 70])
@@ -389,7 +419,7 @@ def register_socket_handlers(app: Flask) -> None:
             emit("playback_error", {"error": "No filename provided"})
             return
 
-        data_dir = Path("motion_data")
+        data_dir = app.config["DATA_DIR"]
         filepath = data_dir / filename
         if not filepath.exists():
             emit("playback_error", {"error": "File not found"})
@@ -413,9 +443,18 @@ def register_socket_handlers(app: Flask) -> None:
                     if not _camera_streams.get(sid, {}).get("active", True):
                         break
 
+                    raw_lm = frame.get("landmarks", [])
+                    if raw_lm and isinstance(raw_lm[0], list):
+                        flat = []
+                        for pt in raw_lm:
+                            flat.extend([pt[1], pt[2]])
+                        landmarks = flat
+                    else:
+                        landmarks = raw_lm
+
                     socketio.emit("playback_frame", {
                         "frame_index": i,
-                        "landmarks": frame.get("landmarks", []),
+                        "landmarks": landmarks,
                         "primitive": frame.get("primitive"),
                         "finger_states": frame.get("finger_states"),
                         "features": frame.get("features"),
@@ -467,7 +506,7 @@ def run_app(
     host: str = "0.0.0.0",
     port: int = 8000,
     debug: bool = False,
-    data_dir: str = "motion_data",
+    data_dir: str = None,
 ) -> None:
     """Run the web application with WebSocket support."""
     app = create_app(data_dir=data_dir)

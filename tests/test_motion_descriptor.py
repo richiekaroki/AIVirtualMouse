@@ -118,14 +118,17 @@ class TestPrimitiveClassification:
         d = md.create_descriptor(make_landmarks(), fingers)
         assert d['primitive'] == expected
 
-    def test_unknown_primitive(self):
+    def test_all_finger_combos_mapped(self):
+        """All 32 finger combos should map to named primitives."""
+        from itertools import product
         md = MotionDescriptor()
-        d = md.create_descriptor(make_landmarks(), [1, 0, 1, 0, 1])
-        assert d['primitive'].startswith("UNKNOWN_")
+        for combo in product(range(2), repeat=5):
+            d = md.create_descriptor(make_landmarks(), list(combo))
+            assert not d['primitive'].startswith("UNKNOWN_"), f"combo {combo} unmapped"
 
     def test_primitive_map_completeness(self):
-        """Test that PRIMITIVE_MAP contains expected primitives."""
-        assert len(PRIMITIVE_MAP) >= 8
+        """Test that PRIMITIVE_MAP contains all 32 combinations."""
+        assert len(PRIMITIVE_MAP) == 32
         assert "POINT" in PRIMITIVE_MAP.values()
 
 

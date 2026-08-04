@@ -3,422 +3,553 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hand Motion Pipeline</title>
+    <title>Hand Motion</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f1a; color: #e0e0e0; }
-        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
-        header { text-align: center; padding: 30px 0 20px; }
-        h1 { font-size: 2rem; color: #00d4ff; letter-spacing: -0.5px; }
-        .subtitle { color: #666; margin-top: 6px; font-size: 0.9rem; }
+        :root {
+            --bg: #0C0C0E;
+            --surface: #141418;
+            --elevated: #1C1C22;
+            --raised: #24242C;
+            --border: #2A2A32;
+            --text: #E8E8EC;
+            --text-2: #A0A0AC;
+            --text-3: #6B6B76;
+            --accent: #F59E0B;
+            --accent-soft: #F59E0B18;
+            --accent-mid: #F59E0B40;
+            --green: #34D399;
+            --green-soft: #34D39918;
+            --red: #EF4444;
+            --red-soft: #EF444418;
+            --purple: #A78BFA;
+            --purple-soft: #A78BFA18;
+            --blue: #60A5FA;
+            --blue-soft: #60A5FA18;
+            --font-display: 'Space Grotesk', system-ui, sans-serif;
+            --font-body: 'DM Sans', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+            --ease: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: var(--font-body); background: var(--bg); color: var(--text); line-height: 1.55; -webkit-font-smoothing: antialiased; overflow: hidden; height: 100vh; }
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: radial-gradient(circle, #ffffff05 1px, transparent 1px);
+            background-size: 24px 24px;
+            pointer-events: none;
+            z-index: 0;
+        }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 
-        .main-grid { display: grid; grid-template-columns: 1fr 320px; gap: 16px; margin-top: 20px; }
-        @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+        .app { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100vh; }
 
-        .card { background: #1a1a2e; border-radius: 10px; padding: 18px; border: 1px solid #252540; }
-        .card h2 { color: #00d4ff; margin-bottom: 12px; font-size: 1rem; font-weight: 600; }
+        /* ── Header ── */
+        .header {
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            height: 48px;
+        }
+        .header-left { display: flex; align-items: center; gap: 10px; }
+        .logo-mark {
+            width: 28px; height: 28px;
+            background: var(--accent);
+            border-radius: 7px;
+            display: grid; place-items: center;
+        }
+        .logo-mark svg { width: 16px; height: 16px; color: var(--bg); }
+        .brand { font-family: var(--font-display); font-size: 0.85rem; font-weight: 600; letter-spacing: -0.2px; }
+        .header-right { display: flex; align-items: center; gap: 10px; }
+        .ws-pill {
+            display: inline-flex; align-items: center; gap: 5px;
+            font-family: var(--font-mono); font-size: 0.62rem; font-weight: 500;
+            padding: 3px 8px; border-radius: 5px;
+            transition: all 250ms var(--ease);
+        }
+        .ws-pill.on { background: var(--green-soft); color: var(--green); }
+        .ws-pill.off { background: var(--red-soft); color: var(--red); }
+        .ws-dot { width: 5px; height: 5px; border-radius: 50%; }
+        .ws-dot.on { background: var(--green); box-shadow: 0 0 8px var(--green); }
+        .ws-dot.off { background: var(--red); }
+        .fps-tag {
+            font-family: var(--font-mono); font-size: 0.62rem; font-weight: 500;
+            color: var(--accent); padding: 3px 8px; border-radius: 5px;
+            background: var(--accent-soft); border: 1px solid var(--accent-mid);
+        }
 
-        .camera-area { position: relative; background: #000; border-radius: 10px; overflow: hidden; aspect-ratio: 4/3; }
-        .camera-area video { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .camera-area canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        .camera-overlay { position: absolute; top: 12px; left: 12px; display: flex; gap: 8px; align-items: center; z-index: 10; }
-        .live-dot { width: 10px; height: 10px; border-radius: 50%; background: #e74c3c; animation: pulse 1.5s infinite; }
-        .live-dot.off { background: #555; animation: none; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        .cam-label { font-size: 0.75rem; color: #fff; background: rgba(0,0,0,0.6); padding: 3px 8px; border-radius: 4px; }
-        .fps-badge { position: absolute; top: 12px; right: 12px; font-size: 0.75rem; color: #0f0; background: rgba(0,0,0,0.6); padding: 3px 8px; border-radius: 4px; z-index: 10; }
-        .camera-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; color: #555; }
-        .camera-placeholder p { font-size: 0.9rem; }
+        /* ── Main: Camera + Panel ── */
+        .main {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            flex: 1;
+            overflow: hidden;
+        }
+        @media (max-width: 900px) { .main { grid-template-columns: 1fr; } }
 
-        .side-panel { display: flex; flex-direction: column; gap: 12px; }
+        /* ── Camera ── */
+        .cam-col { display: flex; flex-direction: column; padding: 16px; gap: 12px; overflow: hidden; }
+        .cam-wrap {
+            position: relative;
+            background: #08080A;
+            border-radius: 14px;
+            overflow: hidden;
+            flex: 1;
+            min-height: 0;
+            border: 1px solid var(--border);
+        }
+        .cam-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .cam-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+        .cam-empty {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+        }
+        .cam-empty-icon {
+            width: 60px; height: 60px; border-radius: 50%;
+            background: var(--elevated);
+            display: grid; place-items: center;
+            border: 1px solid var(--border);
+        }
+        .cam-empty-icon svg { width: 26px; height: 26px; color: var(--text-3); }
+        .cam-empty-text { font-size: 0.8rem; color: var(--text-3); }
+        .cam-empty-text strong { color: var(--text-2); }
 
-        .gesture-big { font-size: 2.2rem; font-weight: 700; color: #2ecc71; text-align: center; padding: 8px 0; letter-spacing: 1px; }
-        .gesture-confidence { text-align: center; font-size: 0.85rem; color: #888; margin-top: -8px; }
+        .cam-overlay {
+            position: absolute; top: 10px; right: 10px;
+            display: flex; gap: 5px; z-index: 5;
+        }
+        .cam-tag {
+            font-family: var(--font-mono); font-size: 0.58rem; font-weight: 500;
+            padding: 3px 8px; border-radius: 5px;
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        }
+        .tag-live { background: rgba(239,68,68,0.15); color: #FCA5A5; border: 1px solid rgba(239,68,68,0.25); display: none; }
+        .tag-live .blink { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #FCA5A5; margin-right: 4px; animation: blink 1.4s infinite; }
+        @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
 
-        .fingers-row { display: flex; justify-content: center; gap: 6px; margin: 10px 0; }
-        .finger-pip { width: 14px; height: 14px; border-radius: 50%; background: #252540; border: 2px solid #333; transition: all 0.15s; }
-        .finger-pip.on { background: #2ecc71; border-color: #2ecc71; box-shadow: 0 0 8px #2ecc7155; }
-        .finger-labels { display: flex; justify-content: center; gap: 6px; font-size: 0.65rem; color: #555; }
+        /* ── Controls row ── */
+        .ctrl-row { display: flex; gap: 6px; flex-shrink: 0; }
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 8px 14px; border-radius: 8px;
+            border: 1px solid transparent;
+            font-family: var(--font-body); font-size: 0.75rem; font-weight: 600;
+            cursor: pointer; transition: all 180ms var(--ease); outline: none;
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn:focus-visible { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--accent); }
+        .btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+        .btn-accent { background: var(--accent); color: var(--bg); }
+        .btn-accent:hover { background: #D97706; }
+        .btn-red { background: var(--red); color: white; }
+        .btn-red:hover { background: #DC2626; }
+        .btn-subtle { background: var(--elevated); color: var(--text-2); border-color: var(--border); }
+        .btn-subtle:hover { background: var(--raised); color: var(--text); }
+        .btn:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+        .btn-record {
+            background: var(--red-soft); color: var(--red); border-color: rgba(239,68,68,0.25);
+            animation: pulse-rec 2s infinite;
+        }
+        @keyframes pulse-rec { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } 50% { box-shadow: 0 0 0 4px rgba(239,68,68,0.15); } }
 
-        .feat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-        .feat-item { background: #12121f; padding: 8px 10px; border-radius: 6px; }
-        .feat-label { font-size: 0.7rem; color: #666; }
-        .feat-val { font-size: 0.95rem; color: #00d4ff; font-weight: 600; }
+        /* ── Right Panel ── */
+        .panel {
+            background: var(--surface);
+            border-left: 1px solid var(--border);
+            display: flex; flex-direction: column;
+            overflow-y: auto;
+        }
 
-        .primitive-bar { display: flex; gap: 3px; margin-top: 8px; flex-wrap: wrap; }
-        .prim-chip { font-size: 0.65rem; padding: 3px 8px; border-radius: 3px; background: #252540; color: #aaa; }
-        .prim-chip.active { background: #00d4ff22; color: #00d4ff; border: 1px solid #00d4ff44; }
+        /* Gesture hero */
+        .gesture-section {
+            padding: 20px 20px 16px;
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+        }
+        .gesture-word {
+            font-family: var(--font-display);
+            font-size: 2.2rem; font-weight: 700;
+            letter-spacing: -1px; line-height: 1;
+            color: var(--text-3);
+            transition: color 200ms var(--ease);
+        }
+        .gesture-word.active { color: var(--accent); }
+        .gesture-meta { font-size: 0.68rem; color: var(--text-3); margin-top: 6px; font-family: var(--font-mono); }
 
-        .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; font-size: 0.85rem; transition: all 0.15s; }
-        .btn-primary { background: #00d4ff; color: #0f0f1a; }
-        .btn-primary:hover { background: #00b8d9; }
-        .btn-danger { background: #e74c3c; color: #fff; }
-        .btn-danger:hover { background: #c0392b; }
-        .btn-secondary { background: #252540; color: #aaa; }
-        .btn-secondary:hover { background: #333355; color: #fff; }
-        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .ml-row {
+            display: flex; align-items: center; gap: 8px;
+            margin-top: 10px; padding: 8px 12px;
+            background: var(--elevated); border-radius: 8px;
+        }
+        .ml-label { font-family: var(--font-mono); font-size: 0.55rem; font-weight: 500; color: var(--purple); text-transform: uppercase; letter-spacing: 0.5px; }
+        .ml-value { font-family: var(--font-display); font-size: 0.82rem; font-weight: 600; color: var(--text); }
+        .ml-conf { font-size: 0.62rem; color: var(--text-3); margin-left: auto; font-family: var(--font-mono); }
 
-        .controls-row { display: flex; gap: 8px; margin-top: 12px; }
+        /* Fingers */
+        .fingers-section { padding: 14px 20px; border-bottom: 1px solid var(--border); }
+        .fingers-row { display: flex; justify-content: center; gap: 6px; }
+        .f-dot {
+            width: 32px; height: 32px; border-radius: 50%;
+            background: var(--elevated); border: 1.5px solid var(--border);
+            display: grid; place-items: center;
+            font-family: var(--font-mono); font-size: 0.52rem; font-weight: 600; color: var(--text-3);
+            transition: all 200ms var(--ease);
+        }
+        .f-dot.on {
+            background: var(--accent-soft); border-color: var(--accent);
+            color: var(--accent);
+            box-shadow: 0 0 12px var(--accent-soft);
+        }
+        .f-labels { display: flex; justify-content: center; gap: 6px; margin-top: 4px; }
+        .f-labels span { width: 32px; text-align: center; font-family: var(--font-mono); font-size: 0.5rem; font-weight: 500; color: var(--text-3); }
 
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-        .stat-card { background: #12121f; padding: 12px; border-radius: 6px; text-align: center; }
-        .stat-num { font-size: 1.5rem; font-weight: 700; color: #00d4ff; }
-        .stat-label { font-size: 0.75rem; color: #666; margin-top: 2px; }
+        /* Features compact */
+        .feat-section { padding: 14px 20px; border-bottom: 1px solid var(--border); }
+        .feat-row { display: flex; gap: 4px; flex-wrap: wrap; }
+        .feat-chip {
+            display: flex; align-items: center; gap: 4px;
+            padding: 4px 8px; border-radius: 5px;
+            background: var(--elevated);
+            font-family: var(--font-mono); font-size: 0.58rem; font-weight: 500;
+        }
+        .feat-chip .k { color: var(--text-3); }
+        .feat-chip .v { color: var(--accent); font-variant-numeric: tabular-nums; }
 
-        .recordings { max-height: 300px; overflow-y: auto; }
-        .rec-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-bottom: 1px solid #252540; cursor: pointer; border-radius: 4px; }
-        .rec-row:hover { background: #252540; }
-        .rec-row.selected { background: #00d4ff15; border: 1px solid #00d4ff33; }
-        .rec-gesture { font-weight: 600; font-size: 0.9rem; }
-        .rec-meta { font-size: 0.75rem; color: #666; }
-
-        .ws-indicator { display: inline-flex; align-items: center; gap: 5px; font-size: 0.75rem; padding: 4px 10px; border-radius: 4px; }
-        .ws-indicator.on { background: #27ae6022; color: #2ecc71; }
-        .ws-indicator.off { background: #e74c3c22; color: #e74c3c; }
-        .ws-dot { width: 6px; height: 6px; border-radius: 50%; }
-        .ws-dot.on { background: #2ecc71; }
-        .ws-dot.off { background: #e74c3c; }
+        /* ── Recordings ── */
+        .rec-section {
+            flex: 1;
+            display: flex; flex-direction: column;
+            overflow: hidden;
+        }
+        .rec-header {
+            padding: 14px 20px 10px;
+            display: flex; align-items: center; justify-content: space-between;
+            flex-shrink: 0;
+        }
+        .rec-title {
+            font-family: var(--font-mono); font-size: 0.58rem; font-weight: 500;
+            text-transform: uppercase; letter-spacing: 1px; color: var(--text-3);
+        }
+        .rec-count {
+            font-family: var(--font-mono); font-size: 0.58rem; font-weight: 500;
+            color: var(--accent); background: var(--accent-soft);
+            padding: 2px 7px; border-radius: 4px;
+        }
+        .rec-grid {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 16px 16px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            align-content: start;
+        }
+        .rec-card {
+            padding: 10px;
+            border-radius: 8px;
+            background: var(--elevated);
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 150ms var(--ease);
+        }
+        .rec-card:hover { background: var(--raised); border-color: var(--border); }
+        .rec-card.selected { background: var(--accent-soft); border-color: var(--accent-mid); }
+        .rec-card-gesture {
+            font-family: var(--font-display); font-size: 0.72rem; font-weight: 600;
+            color: var(--text); margin-bottom: 2px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .rec-card-meta {
+            font-family: var(--font-mono); font-size: 0.52rem; font-weight: 500;
+            color: var(--text-3);
+        }
+        .rec-empty {
+            grid-column: 1 / -1;
+            padding: 24px 0;
+            text-align: center;
+            color: var(--text-3); font-size: 0.75rem;
+        }
+        .rec-actions {
+            padding: 0 16px 12px;
+            display: flex; gap: 6px;
+            flex-shrink: 0;
+        }
+        .rec-actions .btn { flex: 1; padding: 7px 10px; font-size: 0.7rem; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Hand Motion Pipeline</h1>
-            <p class="subtitle">Real-time gesture recognition powered by MediaPipe + ML</p>
-        </header>
+<div class="app">
+    <header class="header">
+        <div class="header-left">
+            <div class="logo-mark">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 13"/>
+                </svg>
+            </div>
+            <span class="brand">Hand Motion</span>
+        </div>
+        <div class="header-right">
+            <span class="fps-tag" id="fps-display">-- FPS</span>
+            <span class="ws-pill off" id="ws-badge"><span class="ws-dot off" id="ws-dot"></span><span id="ws-text">Offline</span></span>
+        </div>
+    </header>
 
-        <div class="main-grid">
-            <div>
-                <div class="card">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                        <h2 style="margin:0;">Camera Feed</h2>
-                        <div style="display:flex;gap:8px;align-items:center;">
-                            <span class="ws-indicator off" id="ws-badge"><span class="ws-dot off" id="ws-dot"></span><span id="ws-text">Disconnected</span></span>
-                            <span class="fps-badge" id="fps-display">-- FPS</span>
-                        </div>
-                    </div>
-                    <div class="camera-area" id="camera-area">
-                        <video id="local-video" autoplay playsinline muted></video>
-                        <canvas id="overlay-canvas"></canvas>
-                        <div class="camera-placeholder" id="placeholder">
-                            <svg width="48" height="48" fill="none" stroke="#444" stroke-width="2" viewBox="0 0 24 24"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-                            <p>Click <b>Start Camera</b> to begin</p>
-                        </div>
-                    </div>
-                    <div class="controls-row">
-                        <button class="btn btn-primary" id="btn-start" onclick="startCamera()">Start Camera</button>
-                        <button class="btn btn-danger" id="btn-stop" onclick="stopCamera()" disabled>Stop</button>
-                        <button class="btn btn-secondary" id="btn-snapshot" onclick="takeSnapshot()" disabled>Snapshot</button>
-                    </div>
+    <div class="main">
+        <!-- Camera -->
+        <div class="cam-col">
+            <div class="cam-wrap" id="camera-area">
+                <video id="local-video" autoplay playsinline muted></video>
+                <canvas id="overlay-canvas"></canvas>
+                <div class="cam-overlay">
+                    <span class="cam-tag tag-live" id="live-badge"><span class="blink"></span>LIVE</span>
                 </div>
+                <div class="cam-empty" id="placeholder">
+                    <div class="cam-empty-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 13"/>
+                        </svg>
+                    </div>
+                    <p class="cam-empty-text">Press <strong>Start</strong> to activate camera</p>
+                </div>
+            </div>
+            <div class="ctrl-row">
+                <button class="btn btn-accent" id="btn-start" onclick="startCamera()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Start
+                </button>
+                <button class="btn btn-red" id="btn-stop" onclick="stopCamera()" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                    Stop
+                </button>
+                <button class="btn btn-subtle" id="btn-snapshot" onclick="takeSnapshot()" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    Capture
+                </button>
+                <button class="btn btn-subtle" id="btn-record" onclick="toggleRecord()" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+                    Rec
+                </button>
+            </div>
+        </div>
 
-                <div class="card" style="margin-top:12px;">
-                    <h2>Gesture Timeline</h2>
-                    <div class="primitive-bar" id="timeline"></div>
+        <!-- Right Panel -->
+        <div class="panel">
+            <div class="gesture-section">
+                <div class="gesture-word" id="gesture-name">--</div>
+                <div class="gesture-meta" id="gesture-conf"></div>
+                <div class="ml-row">
+                    <span class="ml-label">ML</span>
+                    <span class="ml-value" id="ml-gesture-name">--</span>
+                    <span class="ml-conf" id="ml-gesture-conf"></span>
                 </div>
             </div>
 
-            <div class="side-panel">
-                <div class="card">
-                    <h2>Detected Gesture</h2>
-                    <div class="gesture-big" id="gesture-name">--</div>
-                    <div class="gesture-confidence" id="gesture-conf"></div>
-                    <div class="fingers-row" id="fingers-display"></div>
-                    <div class="finger-labels"><span>T</span><span>I</span><span>M</span><span>R</span><span>P</span></div>
-                </div>
+            <div class="fingers-section">
+                <div class="fingers-row" id="fingers-display"></div>
+                <div class="f-labels"><span>T</span><span>I</span><span>M</span><span>R</span><span>P</span></div>
+            </div>
 
-                <div class="card">
-                    <h2>Hand Features</h2>
-                    <div class="feat-grid">
-                        <div class="feat-item"><div class="feat-label">Openness</div><div class="feat-val" id="f-open">--</div></div>
-                        <div class="feat-item"><div class="feat-label">Pinch</div><div class="feat-val" id="f-pinch">--</div></div>
-                        <div class="feat-item"><div class="feat-label">Span</div><div class="feat-val" id="f-span">--</div></div>
-                        <div class="feat-item"><div class="feat-label">Velocity</div><div class="feat-val" id="f-vel">--</div></div>
-                        <div class="feat-item"><div class="feat-label">Palm X</div><div class="feat-val" id="f-px">--</div></div>
-                        <div class="feat-item"><div class="feat-label">Palm Y</div><div class="feat-val" id="f-py">--</div></div>
-                    </div>
+            <div class="feat-section">
+                <div class="feat-row">
+                    <div class="feat-chip"><span class="k">Open</span><span class="v" id="f-open">--</span></div>
+                    <div class="feat-chip"><span class="k">Pinch</span><span class="v" id="f-pinch">--</span></div>
+                    <div class="feat-chip"><span class="k">Span</span><span class="v" id="f-span">--</span></div>
+                    <div class="feat-chip"><span class="k">Vel</span><span class="v" id="f-vel">--</span></div>
                 </div>
+            </div>
 
-                <div class="card">
-                    <h2>Session Stats</h2>
-                    <div class="stats-grid">
-                        <div class="stat-card"><div class="stat-num" id="s-frames">0</div><div class="stat-label">Frames</div></div>
-                        <div class="stat-card"><div class="stat-num" id="s-gestures">0</div><div class="stat-label">Unique</div></div>
-                        <div class="stat-card"><div class="stat-num" id="s-latency">--</div><div class="stat-label">Latency</div></div>
-                        <div class="stat-card"><div class="stat-num" id="s-dataset">--</div><div class="stat-label">Recordings</div></div>
-                    </div>
+            <div class="rec-section">
+                <div class="rec-header">
+                    <span class="rec-title">Library</span>
+                    <span class="rec-count" id="rec-count">0</span>
                 </div>
-
-                <div class="card">
-                    <h2>Recordings</h2>
-                    <div class="recordings" id="rec-list"><div style="padding:12px;color:#555;">Loading...</div></div>
-                    <div class="controls-row" style="margin-top:8px;">
-                        <button class="btn btn-secondary" style="flex:1;" onclick="playSelected()">Play</button>
-                        <button class="btn btn-danger" style="flex:1;" onclick="stopPlayback()">Stop</button>
-                    </div>
+                <div class="rec-grid" id="rec-list"><div class="rec-empty">No recordings yet</div></div>
+                <div class="rec-actions">
+                    <button class="btn btn-subtle" onclick="playSelected()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        Play
+                    </button>
+                    <button class="btn btn-subtle" onclick="stopPlayback()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                        Stop
+                    </button>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
-    <script>
-    const VIDEO_FPS = 15;
-    const JPEG_QUALITY = 0.6;
-    const FRAME_INTERVAL = 1000 / VIDEO_FPS;
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
+<script>
+const VIDEO_FPS = 15, JPEG_QUALITY = 0.6, FRAME_INTERVAL = 1000 / VIDEO_FPS;
+let socket, localStream, videoEl, canvasEl, ctx, sendTimer, selectedRec = null;
+let frameCount = 0, lastFpsTime = Date.now(), fpsCounter = 0;
+let uniqueGestures = new Set();
+let isRecording = false, recordChunks = [];
 
-    let socket = null;
-    let localStream = null;
-    let videoEl = null;
-    let canvasEl = null;
-    let ctx = null;
-    let sendTimer = null;
-    let selectedRec = null;
-    let frameCount = 0;
-    let lastFpsTime = Date.now();
-    let fpsCounter = 0;
-    let timelinePrims = [];
+function initSocket() {
+    socket = io({ transports: ['websocket'] });
+    socket.on('connect', () => { setWsStatus(true); loadRecordings(); });
+    socket.on('disconnect', () => setWsStatus(false));
 
-    function initSocket() {
-        socket = io({ transports: ['websocket'] });
-
-        socket.on('connect', () => {
-            setWsStatus(true);
-            loadRecordings();
-        });
-        socket.on('disconnect', () => setWsStatus(false));
-
-        socket.on('frame_result', (data) => {
-            const latency = Date.now() - (data.client_ts || Date.now());
-            document.getElementById('s-latency').textContent = latency + 'ms';
-
-            if (data.landmarks && data.landmarks.length >= 42) {
-                drawSkeleton(data.landmarks);
-                updateGesture(data.gesture, data.confidence);
-                updateFingers(data.fingers);
-                updateFeatures(data.features, data.velocity);
-                updateTimeline(data.gesture);
-            } else {
-                clearOverlay();
-                updateGesture('No hand', 0);
-                updateFingers([]);
-            }
-
-            fpsCounter++;
-            const now = Date.now();
-            if (now - lastFpsTime >= 1000) {
-                document.getElementById('fps-display').textContent = fpsCounter + ' FPS';
-                fpsCounter = 0;
-                lastFpsTime = now;
-            }
-        });
-
-        socket.on('playback_frame', (data) => {
-            if (data.landmarks && data.landmarks.length >= 42) {
-                drawSkeleton(data.landmarks);
-                updateGesture(data.primitive, 0);
-                updateFingers(data.finger_states);
-                if (data.features) updateFeatures(data.features, data.velocity);
-            }
-        });
-
-        socket.on('playback_started', () => console.log('Playback started'));
-        socket.on('playback_finished', () => { clearOverlay(); console.log('Playback done'); });
-    }
-
-    function setWsStatus(connected) {
-        const badge = document.getElementById('ws-badge');
-        const dot = document.getElementById('ws-dot');
-        const text = document.getElementById('ws-text');
-        badge.className = 'ws-indicator ' + (connected ? 'on' : 'off');
-        dot.className = 'ws-dot ' + (connected ? 'on' : 'off');
-        text.textContent = connected ? 'Connected' : 'Disconnected';
-    }
-
-    async function startCamera() {
-        try {
-            localStream = await navigator.mediaDevices.getUserMedia({
-                video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
-            });
-            videoEl = document.getElementById('local-video');
-            videoEl.srcObject = localStream;
-            await videoEl.play();
-
-            canvasEl = document.getElementById('overlay-canvas');
-            canvasEl.width = videoEl.videoWidth || 640;
-            canvasEl.height = videoEl.videoHeight || 480;
-            ctx = canvasEl.getContext('2d');
-
-            document.getElementById('placeholder').style.display = 'none';
-            document.getElementById('btn-start').disabled = true;
-            document.getElementById('btn-stop').disabled = false;
-            document.getElementById('btn-snapshot').disabled = false;
-
-            sendTimer = setInterval(captureAndSend, FRAME_INTERVAL);
-        } catch (err) {
-            alert('Camera error: ' + err.message);
+    socket.on('frame_result', d => {
+        if (d.landmarks && d.landmarks.length >= 42) {
+            drawSkeleton(d.landmarks);
+            updateGesture(d.gesture, d.confidence);
+            updateMLGesture(d.ml_gesture, d.ml_confidence);
+            updateFingers(d.fingers);
+            updateFeatures(d.features, d.velocity);
+        } else {
+            clearOverlay(); updateGesture(null); updateMLGesture(null); updateFingers([]);
         }
+        fpsCounter++;
+        const now = Date.now();
+        if (now - lastFpsTime >= 1000) { document.getElementById('fps-display').textContent = fpsCounter + ' FPS'; fpsCounter = 0; lastFpsTime = now; }
+    });
+
+    socket.on('playback_frame', d => {
+        if (d.landmarks && d.landmarks.length >= 42) { drawSkeleton(d.landmarks); updateGesture(d.primitive); updateMLGesture(null); updateFingers(d.finger_states); if (d.features) updateFeatures(d.features, d.velocity); }
+    });
+    socket.on('playback_finished', () => { clearOverlay(); updateGesture(null); });
+}
+
+function setWsStatus(on) {
+    document.getElementById('ws-badge').className = 'ws-pill ' + (on ? 'on' : 'off');
+    document.getElementById('ws-dot').className = 'ws-dot ' + (on ? 'on' : 'off');
+    document.getElementById('ws-text').textContent = on ? 'Live' : 'Offline';
+}
+
+async function startCamera() {
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } });
+        videoEl = document.getElementById('local-video');
+        videoEl.srcObject = localStream; await videoEl.play();
+        canvasEl = document.getElementById('overlay-canvas');
+        canvasEl.width = videoEl.videoWidth || 640; canvasEl.height = videoEl.videoHeight || 480;
+        ctx = canvasEl.getContext('2d');
+        document.getElementById('placeholder').style.display = 'none';
+        document.getElementById('btn-start').disabled = true;
+        document.getElementById('btn-stop').disabled = false;
+        document.getElementById('btn-snapshot').disabled = false;
+        document.getElementById('btn-record').disabled = false;
+        document.getElementById('live-badge').style.display = '';
+        sendTimer = setInterval(captureAndSend, FRAME_INTERVAL);
+    } catch (e) { alert('Camera unavailable: ' + e.message); }
+}
+
+function stopCamera() {
+    if (sendTimer) clearInterval(sendTimer); sendTimer = null;
+    if (localStream) localStream.getTracks().forEach(t => t.stop()); localStream = null;
+    if (isRecording) toggleRecord();
+    clearOverlay();
+    document.getElementById('placeholder').style.display = '';
+    document.getElementById('btn-start').disabled = false;
+    document.getElementById('btn-stop').disabled = true;
+    document.getElementById('btn-snapshot').disabled = true;
+    document.getElementById('btn-record').disabled = true;
+    document.getElementById('live-badge').style.display = 'none';
+    document.getElementById('fps-display').textContent = '-- FPS';
+}
+
+function captureAndSend() {
+    if (!videoEl || !localStream || !socket || !socket.connected || videoEl.readyState < 2) return;
+    const w = videoEl.videoWidth || 640, h = videoEl.videoHeight || 480;
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    c.getContext('2d').drawImage(videoEl, 0, 0, w, h);
+    frameCount++;
+    socket.emit('process_frame', { image: c.toDataURL('image/jpeg', JPEG_QUALITY).split(',')[1], width: w, height: h, client_ts: Date.now(), frame_num: frameCount });
+}
+
+function drawSkeleton(lm) {
+    if (!ctx || !canvasEl) return;
+    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+    const sx = canvasEl.width / 640, sy = canvasEl.height / 480;
+    const conns = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
+    ctx.strokeStyle = 'rgba(245,158,11,0.6)'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    for (const [a, b] of conns) { ctx.beginPath(); ctx.moveTo(lm[a*2]*sx, lm[a*2+1]*sy); ctx.lineTo(lm[b*2]*sx, lm[b*2+1]*sy); ctx.stroke(); }
+    for (let i = 0; i < 21; i++) {
+        const x = lm[i*2]*sx, y = lm[i*2+1]*sy, tip = [4,8,12,16,20].includes(i);
+        ctx.fillStyle = tip ? '#F59E0B' : '#E8E8EC';
+        ctx.beginPath(); ctx.arc(x, y, tip ? 4 : 2.5, 0, Math.PI*2); ctx.fill();
     }
+}
 
-    function stopCamera() {
-        if (sendTimer) { clearInterval(sendTimer); sendTimer = null; }
-        if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-        clearOverlay();
-        document.getElementById('placeholder').style.display = 'flex';
-        document.getElementById('btn-start').disabled = false;
-        document.getElementById('btn-stop').disabled = true;
-        document.getElementById('btn-snapshot').disabled = true;
-        document.getElementById('fps-display').textContent = '-- FPS';
-    }
+function clearOverlay() { if (ctx) ctx.clearRect(0, 0, canvasEl.width, canvasEl.height); }
 
-    function captureAndSend() {
-        if (!videoEl || !localStream || !socket || !socket.connected) return;
-        if (videoEl.readyState < 2) return;
+function updateGesture(name) {
+    const el = document.getElementById('gesture-name'), cf = document.getElementById('gesture-conf');
+    if (!name) { el.textContent = '--'; el.classList.remove('active'); cf.textContent = ''; return; }
+    el.textContent = name.replace(/_/g, ' '); el.classList.add('active'); cf.textContent = 'rule-based';
+}
 
-        const w = videoEl.videoWidth || 640;
-        const h = videoEl.videoHeight || 480;
+function updateMLGesture(name, conf) {
+    const el = document.getElementById('ml-gesture-name'), cf = document.getElementById('ml-gesture-conf');
+    if (!name) { el.textContent = '--'; cf.textContent = ''; return; }
+    el.textContent = name.replace(/_/g, ' ');
+    cf.textContent = conf != null ? Math.round(conf * 100) + '%' : '';
+}
 
-        const tmpCanvas = document.createElement('canvas');
-        tmpCanvas.width = w;
-        tmpCanvas.height = h;
-        const tmpCtx = tmpCanvas.getContext('2d');
-        tmpCtx.drawImage(videoEl, 0, 0, w, h);
+function updateFingers(f) {
+    const el = document.getElementById('fingers-display'), L = ['T','I','M','R','P'];
+    if (!f || !f.length) { el.innerHTML = L.map(l => `<div class="f-dot">${l}</div>`).join(''); return; }
+    el.innerHTML = f.map((v, i) => `<div class="f-dot ${v ? 'on' : ''}">${L[i]}</div>`).join('');
+}
 
-        const dataUrl = tmpCanvas.toDataURL('image/jpeg', JPEG_QUALITY);
-        const base64 = dataUrl.split(',')[1];
+function updateFeatures(f, v) {
+    if (!f) return;
+    document.getElementById('f-open').textContent = f.hand_openness != null ? f.hand_openness.toFixed(2) : '--';
+    document.getElementById('f-pinch').textContent = f.pinch_distance != null ? Math.round(f.pinch_distance) : '--';
+    document.getElementById('f-span').textContent = f.hand_span != null ? Math.round(f.hand_span) : '--';
+    if (v) document.getElementById('f-vel').textContent = v.magnitude != null ? Math.round(v.magnitude) : '--';
+}
 
-        frameCount++;
-        document.getElementById('s-frames').textContent = frameCount;
+function toggleRecord() {
+    isRecording = !isRecording;
+    const btn = document.getElementById('btn-record');
+    if (isRecording) { btn.classList.add('btn-record'); btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Stop'; }
+    else { btn.classList.remove('btn-record'); btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg> Rec'; }
+}
 
-        socket.emit('process_frame', {
-            image: base64,
-            width: w,
-            height: h,
-            client_ts: Date.now(),
-            frame_num: frameCount,
-        });
-    }
+function takeSnapshot() {
+    if (!videoEl || !localStream) return;
+    const c = document.createElement('canvas'); c.width = videoEl.videoWidth; c.height = videoEl.videoHeight;
+    c.getContext('2d').drawImage(videoEl, 0, 0);
+    const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = 'capture_' + Date.now() + '.png'; a.click();
+}
 
-    function drawSkeleton(lm) {
-        if (!ctx || !canvasEl) return;
-        ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-        const sx = canvasEl.width / 640;
-        const sy = canvasEl.height / 480;
+const GESTURE_ICONS = {
+    POINT:'\u261D', OPEN_HAND:'\u270B', FIST:'\u270A', PEACE_V:'\u270C', THUMBS_UP:'\u{1F44D}',
+    PINCH:'\u{1F90F}', OK_SIGN:'\u{1F44C}', WAVE:'\u{1F44B}', CIRCLE:'\u{2B55}', GRAB:'\u{1F91F}',
+    PUSH:'\u{1F446}', SWIPE_LEFT:'\u{2B05}', SWIPE_RIGHT:'\u{27A1}', THREE:'\u{1F446}', FOUR:'\u{1F44F}',
+    PINKY:'\u{1F91E}', GUN:'\u{1F52B}', SPIDER:'\u{1F577}', ROCK:'\u{1F918}', SHAKA:'\u{1F44F}',
+};
 
-        const connections = [
-            [0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
-            [0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],
-            [0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]
-        ];
+function selectRec(el, f) { document.querySelectorAll('.rec-card').forEach(e => e.classList.remove('selected')); el.classList.add('selected'); selectedRec = f; }
+function playSelected() { if (!selectedRec || !socket || !socket.connected) return; socket.emit('play_recording', { filename: selectedRec, speed: 1.0 }); }
+function stopPlayback() { if (socket) socket.emit('stop_playback'); }
 
-        ctx.strokeStyle = '#00d4ff';
-        ctx.lineWidth = 2;
-        for (const [a, b] of connections) {
-            const ax = lm[a*2] * sx, ay = lm[a*2+1] * sy;
-            const bx = lm[b*2] * sx, by = lm[b*2+1] * sy;
-            ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
-        }
-
-        ctx.fillStyle = '#fff';
-        for (let i = 0; i < 21; i++) {
-            const x = lm[i*2] * sx, y = lm[i*2+1] * sy;
-            ctx.beginPath(); ctx.arc(x, y, [4,8,12,16,20].includes(i) ? 5 : 3, 0, Math.PI*2); ctx.fill();
-        }
-
-        ctx.fillStyle = '#2ecc71';
-        for (const t of [4,8,12,16,20]) {
-            const x = lm[t*2] * sx, y = lm[t*2+1] * sy;
-            ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI*2); ctx.fill();
-        }
-    }
-
-    function clearOverlay() { if (ctx) ctx.clearRect(0, 0, canvasEl.width, canvasEl.height); }
-
-    function updateGesture(name, conf) {
-        document.getElementById('gesture-name').textContent = name || '--';
-        document.getElementById('gesture-conf').textContent = conf > 0 ? (conf * 100).toFixed(0) + '% confidence' : '';
-    }
-
-    function updateFingers(fingers) {
-        const el = document.getElementById('fingers-display');
-        if (!fingers || fingers.length === 0) { el.innerHTML = ''; return; }
-        el.innerHTML = fingers.map((f, i) =>
-            `<div class="finger-pip ${f ? 'on' : ''}" title="${['Thumb','Index','Middle','Ring','Pinky'][i]}"></div>`
-        ).join('');
-    }
-
-    function updateFeatures(features, velocity) {
-        if (!features) return;
-        const f = features;
-        document.getElementById('f-open').textContent = f.hand_openness != null ? f.hand_openness.toFixed(2) : '--';
-        document.getElementById('f-pinch').textContent = f.pinch_distance != null ? f.pinch_distance.toFixed(0) + 'px' : '--';
-        document.getElementById('f-span').textContent = f.hand_span != null ? f.hand_span.toFixed(0) + 'px' : '--';
-        if (f.palm_center) {
-            document.getElementById('f-px').textContent = f.palm_center.x != null ? f.palm_center.x.toFixed(0) : '--';
-            document.getElementById('f-py').textContent = f.palm_center.y != null ? f.palm_center.y.toFixed(0) : '--';
-        }
-        if (velocity) {
-            document.getElementById('f-vel').textContent = velocity.magnitude != null ? velocity.magnitude.toFixed(0) + 'px/s' : '--';
-        }
-    }
-
-    function updateTimeline(prim) {
-        if (!prim || prim === 'UNKNOWN') return;
-        if (timelinePrims.length === 0 || timelinePrims[timelinePrims.length - 1] !== prim) {
-            timelinePrims.push(prim);
-            if (timelinePrims.length > 30) timelinePrims.shift();
-        }
-        const el = document.getElementById('timeline');
-        el.innerHTML = timelinePrims.map(p => {
-            const colors = {
-                POINT:'#ff8c00',OPEN_HAND:'#2ecc71',FIST:'#e74c3c',PEACE:'#9b59b6',
-                THUMBS_UP:'#f1c40f',PINCH:'#e67e22',WAVE:'#8e44ad',CIRCLE:'#1abc9c',
-                GRAB:'#e74c3c',PUSH:'#3498db',SWIPE_LEFT:'#e67e22',SWIPE_RIGHT:'#e67e22',
-            };
-            return `<span class="prim-chip" style="background:${colors[p]||'#333'}22;color:${colors[p]||'#aaa'};border:1px solid ${colors[p]||'#333'}44">${p}</span>`;
+async function loadRecordings() {
+    try {
+        const r = await fetch('/api/recordings'), d = await r.json(), el = document.getElementById('rec-list');
+        document.getElementById('rec-count').textContent = d.count;
+        if (!d.recordings.length) { el.innerHTML = '<div class="rec-empty">No recordings yet</div>'; return; }
+        el.innerHTML = d.recordings.map(r => {
+            const icon = GESTURE_ICONS[r.gesture.toUpperCase()] || '\u{1F590}';
+            return `<div class="rec-card" onclick="selectRec(this,'${r.filename}')" data-file="${r.filename}"><div class="rec-card-gesture">${icon} ${r.gesture}</div><div class="rec-card-meta">${r.frames}f \u00B7 ${r.duration.toFixed(1)}s</div></div>`;
         }).join('');
-    }
+    } catch(e) {}
+}
 
-    function takeSnapshot() {
-        if (!videoEl || !localStream) return;
-        const c = document.createElement('canvas');
-        c.width = videoEl.videoWidth; c.height = videoEl.videoHeight;
-        c.getContext('2d').drawImage(videoEl, 0, 0);
-        const a = document.createElement('a');
-        a.href = c.toDataURL('image/png');
-        a.download = 'snapshot_' + Date.now() + '.png';
-        a.click();
-    }
-
-    async function loadRecordings() {
-        try {
-            const r = await fetch('/api/recordings');
-            const data = await r.json();
-            const el = document.getElementById('rec-list');
-            document.getElementById('s-dataset').textContent = data.count;
-            if (!data.recordings.length) { el.innerHTML = '<div style="padding:12px;color:#555;">No recordings</div>'; return; }
-            el.innerHTML = data.recordings.map(rec =>
-                `<div class="rec-row" onclick="selectRec(this,'${rec.filename}')" data-file="${rec.filename}">
-                    <div><div class="rec-gesture">${rec.gesture}</div><div class="rec-meta">${rec.frames}f / ${rec.duration.toFixed(1)}s</div></div>
-                </div>`
-            ).join('');
-        } catch(e) { console.error(e); }
-    }
-
-    function selectRec(el, file) {
-        document.querySelectorAll('.rec-row').forEach(e => e.classList.remove('selected'));
-        el.classList.add('selected');
-        selectedRec = file;
-    }
-
-    function playSelected() {
-        if (!selectedRec || !socket || !socket.connected) return alert('Select a recording first');
-        socket.emit('play_recording', { filename: selectedRec, speed: 1.0 });
-    }
-
-    function stopPlayback() { if (socket) socket.emit('stop_playback'); }
-
-    window.addEventListener('load', () => { initSocket(); loadRecordings(); });
-    </script>
+window.addEventListener('load', () => { initSocket(); loadRecordings(); updateFingers([]); });
+</script>
 </body>
 </html>

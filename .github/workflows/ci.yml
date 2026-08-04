@@ -25,7 +25,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install -e .
+          pip install -e ".[dev]"
 
       - name: Run tests
         run: |
@@ -34,4 +34,4 @@ jobs:
       - name: Check imports
         run: |
           python -c "from hand_motion.descriptor import MotionDescriptor; print('MotionDescriptor OK')"
-          python -c "from hand_motion.detection import handDetector; print('HandTrackingModule OK')"
+          python -c "from hand_motion.detection import HandDetector; print('HandTrackingModule OK')"
