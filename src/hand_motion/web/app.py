@@ -26,7 +26,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "https://hand-motion-pipeline.onrender.com")
+_raw_origins = os.environ.get(
+    "ALLOWED_ORIGINS",
+    "https://hand-motion-pipeline.onrender.com,http://localhost:*,http://127.0.0.1:*"
+)
+ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+# Use wildcard if any entry contains a wildcard pattern
+if any("*" in o for o in ALLOWED_ORIGINS):
+    ALLOWED_ORIGINS = "*"
 socketio = SocketIO(cors_allowed_origins=ALLOWED_ORIGINS, async_mode="threading")
 
 
