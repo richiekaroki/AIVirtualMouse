@@ -28,6 +28,7 @@ try:
     from sklearn.model_selection import cross_val_score
     from sklearn.preprocessing import LabelEncoder
     from sklearn.pipeline import Pipeline
+    from sklearn.calibration import CalibratedClassifierCV
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
@@ -118,12 +119,14 @@ class LandmarkClassifier:
 
     DEFAULT_MODEL_PATH = "models/landmark_classifier.pkl"
 
-    def __init__(self, model_path: Optional[str] = None):
+    def __init__(self, model_path: Optional[str] = None, calibrate: bool = True):
         self.model = None
         self.label_encoder = LabelEncoder()
         self.is_trained = False
         self.model_path = model_path or self.DEFAULT_MODEL_PATH
         self.gesture_names: List[str] = []
+        self.calibrate = calibrate
+        self.calibrated_pipeline = None
 
         if SKLEARN_AVAILABLE:
             self.pipeline = Pipeline([
@@ -196,6 +199,20 @@ class LandmarkClassifier:
         scores = cross_val_score(self.pipeline, X, y_encoded, cv=cv_folds, scoring="accuracy")
 
         self.pipeline.fit(X, y_encoded)
+
+        # Platt scaling: fit calibrated classifier on training data
+        if self.calibrate and len(set(y)) >= 2:
+            try:
+                self.calibrated_pipeline = CalibratedClassifierCV(
+                    self.pipeline, method="sigmoid", cv=3
+                )
+                self.calibrated_pipeline.fit(X, y_encoded)
+            except Exception as e:
+                logger.warning("Platt scaling failed, using raw probabilities: %s", e)
+                self.calibrated_pipeline = None
+        else:
+            self.calibrated_pipeline = None
+
         self.is_trained = True
 
         report = {
@@ -225,8 +242,11 @@ class LandmarkClassifier:
             return self._rule_based_predict(lm_list)
 
         features = self.extract_features(lm_list).reshape(1, -1)
-        pred_encoded = self.pipeline.predict(features)[0]
-        probs = self.pipeline.predict_proba(features)[0]
+
+        # Use calibrated pipeline if available for better confidence estimates
+        active = self.calibrated_pipeline or self.pipeline
+        pred_encoded = active.predict(features)[0]
+        probs = active.predict_proba(features)[0]
 
         gesture = self.label_encoder.inverse_transform([pred_encoded])[0]
         confidence = float(np.max(probs))
@@ -240,7 +260,7 @@ class LandmarkClassifier:
             "gesture": gesture,
             "confidence": confidence,
             "probabilities": prob_dict,
-            "method": "ml",
+            "method": "ml_calibrated" if self.calibrated_pipeline else "ml",
         }
 
     def _rule_based_predict(self, lm_list: List[List[float]]) -> Dict[str, Any]:
@@ -290,6 +310,8 @@ class LandmarkClassifier:
             "pipeline": self.pipeline,
             "label_encoder": self.label_encoder,
             "gesture_names": self.gesture_names,
+            "calibrated_pipeline": self.calibrated_pipeline,
+            "calibrate": self.calibrate,
         }
         with open(path, "wb") as f:
             pickle.dump(data, f)
@@ -307,6 +329,8 @@ class LandmarkClassifier:
             self.pipeline = data["pipeline"]
             self.label_encoder = data["label_encoder"]
             self.gesture_names = data["gesture_names"]
+            self.calibrated_pipeline = data.get("calibrated_pipeline")
+            self.calibrate = data.get("calibrate", True)
             self.is_trained = True
             logger.info("Loaded model from %s (%d gestures)", path, len(self.gesture_names))
             return True
