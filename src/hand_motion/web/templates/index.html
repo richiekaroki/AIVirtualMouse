@@ -199,7 +199,17 @@
             transition: color 200ms var(--ease);
         }
         .gesture-word.active { color: var(--accent); }
-        .gesture-meta { font-size: 0.68rem; color: var(--text-3); margin-top: 6px; font-family: var(--font-mono); }
+        .gesture-meta { font-size: 0.68rem; color: var(--text-3); margin-top: 6px; font-family: var(--font-mono); display: flex; justify-content: center; gap: 8px; align-items: center; }
+        .hand-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 2px 8px; border-radius: 4px;
+            font-family: var(--font-mono); font-size: 0.58rem; font-weight: 600;
+            background: var(--elevated); color: var(--text-3);
+            border: 1px solid var(--border);
+            transition: all 200ms var(--ease);
+        }
+        .hand-badge.left { background: var(--blue-soft); color: var(--blue); border-color: rgba(96,165,250,0.3); }
+        .hand-badge.right { background: var(--purple-soft); color: var(--purple); border-color: rgba(167,139,250,0.3); }
 
         .ml-row {
             display: flex; align-items: center; gap: 8px;
@@ -361,7 +371,10 @@
         <div class="panel">
             <div class="gesture-section">
                 <div class="gesture-word" id="gesture-name">--</div>
-                <div class="gesture-meta" id="gesture-conf"></div>
+                <div class="gesture-meta">
+                    <span id="gesture-conf"></span>
+                    <span class="hand-badge" id="handedness-badge">--</span>
+                </div>
                 <div class="ml-row">
                     <span class="ml-label">ML</span>
                     <span class="ml-value" id="ml-gesture-name">--</span>
@@ -424,8 +437,9 @@ function initSocket() {
             updateMLGesture(d.ml_gesture, d.ml_confidence);
             updateFingers(d.fingers);
             updateFeatures(d.features, d.velocity);
+            updateHandedness(d.handedness);
         } else {
-            clearOverlay(); updateGesture(null); updateMLGesture(null); updateFingers([]);
+            clearOverlay(); updateGesture(null); updateMLGesture(null); updateFingers([]); updateHandedness(null);
         }
         fpsCounter++;
         const now = Date.now();
@@ -433,9 +447,9 @@ function initSocket() {
     });
 
     socket.on('playback_frame', d => {
-        if (d.landmarks && d.landmarks.length >= 42) { drawSkeleton(d.landmarks); updateGesture(d.primitive); updateMLGesture(null); updateFingers(d.finger_states); if (d.features) updateFeatures(d.features, d.velocity); }
+        if (d.landmarks && d.landmarks.length >= 42) { drawSkeleton(d.landmarks); updateGesture(d.primitive); updateMLGesture(null); updateFingers(d.finger_states); if (d.features) updateFeatures(d.features, d.velocity); updateHandedness(d.handedness); }
     });
-    socket.on('playback_finished', () => { clearOverlay(); updateGesture(null); });
+    socket.on('playback_finished', () => { clearOverlay(); updateGesture(null); updateHandedness(null); });
 }
 
 function setWsStatus(on) {
@@ -526,6 +540,13 @@ function updateFeatures(f, v) {
     document.getElementById('f-pinch').textContent = f.pinch_distance != null ? Math.round(f.pinch_distance) : '--';
     document.getElementById('f-span').textContent = f.hand_span != null ? Math.round(f.hand_span) : '--';
     if (v) document.getElementById('f-vel').textContent = v.magnitude != null ? Math.round(v.magnitude) : '--';
+}
+
+function updateHandedness(h) {
+    const el = document.getElementById('handedness-badge');
+    if (!h || h === 'Unknown') { el.textContent = '--'; el.className = 'hand-badge'; return; }
+    el.textContent = h;
+    el.className = 'hand-badge ' + h.toLowerCase();
 }
 
 function toggleRecord() {

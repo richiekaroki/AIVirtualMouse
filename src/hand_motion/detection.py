@@ -35,7 +35,7 @@ class HandDetector:
 
     __slots__ = (
         'mode', 'maxHands', 'detectionCon', 'trackCon',
-        'detector', 'tipIds', 'results', 'lmList'
+        'detector', 'tipIds', 'results', 'lmList', 'handedness'
     )
 
     def __init__(
@@ -70,6 +70,7 @@ class HandDetector:
         self.tipIds: List[int] = [4, 8, 12, 16, 20]
         self.results: Optional[List[Any]] = None
         self.lmList: LandmarkList = []
+        self.handedness: str = "Unknown"
 
     def findHands(self, img: np.ndarray, draw: bool = True) -> np.ndarray:
         """
@@ -134,6 +135,39 @@ class HandDetector:
                 ]
 
         return self.lmList, bbox
+
+    def getHandedness(self, handNo: int = 0) -> str:
+        """
+        Determine handedness (Left/Right) from landmark positions.
+
+        Uses a heuristic based on the relative positions of the wrist (landmark 0)
+        and the middle finger MCP (landmark 9). Works best with a mirrored
+        (selfie) camera view.
+
+        Args:
+            handNo: Hand index to check
+
+        Returns:
+            "Left" or "Right" (or "Unknown" if detection fails)
+        """
+        if not self.results or len(self.results) <= handNo:
+            return "Unknown"
+
+        hand = self.results[handNo]
+        lm_list = hand.get("lmList", [])
+
+        if len(lm_list) < 10:
+            return "Unknown"
+
+        wrist_x = lm_list[0][0]
+        middle_mcp_x = lm_list[9][0]
+
+        if wrist_x < middle_mcp_x:
+            self.handedness = "Right"
+        else:
+            self.handedness = "Left"
+
+        return self.handedness
 
     def fingersUp(self) -> List[int]:
         """

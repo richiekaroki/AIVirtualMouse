@@ -334,10 +334,12 @@ def register_socket_handlers(app: Flask) -> None:
                 "velocity": None,
                 "ml_gesture": None,
                 "ml_confidence": 0,
+                "handedness": "Unknown",
             }
 
             if lm_list and len(lm_list) != 0:
                 fingers = detector.fingersUp()
+                handedness = detector.getHandedness()
                 descriptor.create_descriptor(lm_list, fingers, frame_shape=(height, width))
 
                 flat = []
@@ -362,6 +364,7 @@ def register_socket_handlers(app: Flask) -> None:
                     "velocity": last_desc["velocity"] if last_desc else None,
                     "ml_gesture": ml_result.get("gesture"),
                     "ml_confidence": ml_result.get("confidence", 0),
+                    "handedness": handedness,
                 })
 
             emit("frame_result", result)
