@@ -7,6 +7,8 @@ AI-powered gesture classification using:
 - Attention mechanism for important timesteps
 """
 
+from __future__ import annotations
+
 import os
 import json
 import numpy as np

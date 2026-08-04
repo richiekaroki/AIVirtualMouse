@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+.git/
+.github/
+.vscode/
+*.md
+!README.md
+motion_data/*.json

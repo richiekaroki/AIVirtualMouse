@@ -216,7 +216,7 @@ The project includes comprehensive unit tests with **79 test cases** covering:
 ### Test Categories
 
 | Category | Tests | Coverage |
-|----------|-------|----------|
+| ---------- | ------- | ---------- |
 | Unit Tests | 60 | 90%+ |
 | Integration Tests | 15 | 80%+ |
 | Edge Cases | 4 | 100% |

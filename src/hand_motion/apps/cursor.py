@@ -12,11 +12,13 @@ Controls:
         - Press 'q' = quit application
 """
 
+import os
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+
 import cv2
 import numpy as np
 import time
 import pyautogui
-import os
 import sys
 import logging
 import argparse
@@ -92,7 +94,10 @@ def main():
     args = parse_args()
     wCam, hCam = args.width, args.height
     frameR = 100
-    smoothening = 10
+    smoothening = 5
+
+    pyautogui.PAUSE = 0
+    pyautogui.FAILSAFE = True
 
     pTime = 0
     plocX, plocY = 0, 0
@@ -105,7 +110,7 @@ def main():
         logger.error("Cannot open camera %d", args.camera)
         sys.exit(1)
 
-    detector = handDetector()
+    detector = handDetector(detectionCon=0.7)
     motion_descriptor = MotionDescriptor()
     wScr, hScr = pyautogui.size()
 
@@ -157,7 +162,7 @@ def main():
                     if length < 40:
                         cv2.circle(img, (lineInfo[4], lineInfo[5]), 15, (0, 255, 0), cv2.FILLED)
                         pyautogui.click()
-                        time.sleep(0.2)
+                        time.sleep(0.05)
             else:
                 frame_count += 1
                 cv2.rectangle(img, (0, 0), (wCam, hCam), (0, 0, 255), 5)

@@ -1,12 +1,10 @@
-# Core dependencies
+# Web-only dependencies (no PyAutoGUI, no display required)
 cvzone==2.0.0
 mediapipe==0.10.35
-opencv-contrib-python>=4.11.0.86
+opencv-contrib-python-headless>=4.11.0.86
 numpy>=1.26.4
 matplotlib>=3.10.8
 scikit-learn>=1.6.0
-
-# Web interface
 Flask>=3.0.0
 flask-socketio>=5.3.0
 gunicorn>=23.0.0

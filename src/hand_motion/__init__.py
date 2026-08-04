@@ -27,6 +27,13 @@ Applications:
     - web: Browser-based interface
 """
 
+import os
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+
+import logging as _logging
+_logging.getLogger("tensorflow").setLevel(_logging.ERROR)
+_logging.getLogger("mediapipe").setLevel(_logging.ERROR)
+
 from hand_motion.descriptor import MotionDescriptor
 from hand_motion.descriptor import PRIMITIVE_MAP
 
@@ -47,7 +54,9 @@ __all__ = [
     "GPUManager",
     "MotionDatabase",
     "GlossAnnotator",
-    "AnimationExporter"
+    "AnimationExporter",
+    "VideoExporter",
+    "LandmarkClassifier",
 ]
 
 
@@ -98,4 +107,10 @@ def __getattr__(name: str):
     elif name == "AnimationExporter":
         from hand_motion.animation import AnimationExporter
         return AnimationExporter
+    elif name == "VideoExporter":
+        from hand_motion.video_export import VideoExporter
+        return VideoExporter
+    elif name == "LandmarkClassifier":
+        from hand_motion.ai.landmark_classifier import LandmarkClassifier
+        return LandmarkClassifier
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

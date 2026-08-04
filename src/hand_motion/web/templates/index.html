@@ -6,154 +6,419 @@
     <title>Hand Motion Pipeline</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #eee; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        header { text-align: center; padding: 40px 0; }
-        h1 { font-size: 2.5rem; color: #00d4ff; }
-        .subtitle { color: #888; margin-top: 10px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 40px; }
-        .card { background: #16213e; border-radius: 12px; padding: 24px; border: 1px solid #0f3460; }
-        .card h2 { color: #00d4ff; margin-bottom: 16px; font-size: 1.2rem; }
-        .stat { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #0f3460; }
-        .stat:last-child { border: none; }
-        .stat-value { color: #00d4ff; font-weight: bold; }
-        .btn { display: inline-block; background: #00d4ff; color: #1a1a2e; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold; margin: 5px; cursor: pointer; border: none; }
-        .btn:hover { background: #00b8d9; }
-        .btn-secondary { background: #0f3460; color: #eee; }
-        .btn-secondary:hover { background: #1a4a7a; }
-        .recording-list { max-height: 400px; overflow-y: auto; }
-        .recording-item { padding: 12px; border-bottom: 1px solid #0f3460; display: flex; justify-content: space-between; align-items: center; }
-        .recording-item:hover { background: #0f3460; }
-        .gesture-badge { background: #0f3460; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; }
-        .status { padding: 20px; text-align: center; }
-        .status.ok { color: #00ff88; }
-        .status.error { color: #ff4444; }
-        .api-info { background: #0f3460; padding: 16px; border-radius: 8px; margin-top: 20px; font-family: monospace; font-size: 0.9rem; }
-        .api-info code { color: #00d4ff; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f1a; color: #e0e0e0; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        header { text-align: center; padding: 30px 0 20px; }
+        h1 { font-size: 2rem; color: #00d4ff; letter-spacing: -0.5px; }
+        .subtitle { color: #666; margin-top: 6px; font-size: 0.9rem; }
+
+        .main-grid { display: grid; grid-template-columns: 1fr 320px; gap: 16px; margin-top: 20px; }
+        @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+
+        .card { background: #1a1a2e; border-radius: 10px; padding: 18px; border: 1px solid #252540; }
+        .card h2 { color: #00d4ff; margin-bottom: 12px; font-size: 1rem; font-weight: 600; }
+
+        .camera-area { position: relative; background: #000; border-radius: 10px; overflow: hidden; aspect-ratio: 4/3; }
+        .camera-area video { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .camera-area canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .camera-overlay { position: absolute; top: 12px; left: 12px; display: flex; gap: 8px; align-items: center; z-index: 10; }
+        .live-dot { width: 10px; height: 10px; border-radius: 50%; background: #e74c3c; animation: pulse 1.5s infinite; }
+        .live-dot.off { background: #555; animation: none; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .cam-label { font-size: 0.75rem; color: #fff; background: rgba(0,0,0,0.6); padding: 3px 8px; border-radius: 4px; }
+        .fps-badge { position: absolute; top: 12px; right: 12px; font-size: 0.75rem; color: #0f0; background: rgba(0,0,0,0.6); padding: 3px 8px; border-radius: 4px; z-index: 10; }
+        .camera-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; color: #555; }
+        .camera-placeholder p { font-size: 0.9rem; }
+
+        .side-panel { display: flex; flex-direction: column; gap: 12px; }
+
+        .gesture-big { font-size: 2.2rem; font-weight: 700; color: #2ecc71; text-align: center; padding: 8px 0; letter-spacing: 1px; }
+        .gesture-confidence { text-align: center; font-size: 0.85rem; color: #888; margin-top: -8px; }
+
+        .fingers-row { display: flex; justify-content: center; gap: 6px; margin: 10px 0; }
+        .finger-pip { width: 14px; height: 14px; border-radius: 50%; background: #252540; border: 2px solid #333; transition: all 0.15s; }
+        .finger-pip.on { background: #2ecc71; border-color: #2ecc71; box-shadow: 0 0 8px #2ecc7155; }
+        .finger-labels { display: flex; justify-content: center; gap: 6px; font-size: 0.65rem; color: #555; }
+
+        .feat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .feat-item { background: #12121f; padding: 8px 10px; border-radius: 6px; }
+        .feat-label { font-size: 0.7rem; color: #666; }
+        .feat-val { font-size: 0.95rem; color: #00d4ff; font-weight: 600; }
+
+        .primitive-bar { display: flex; gap: 3px; margin-top: 8px; flex-wrap: wrap; }
+        .prim-chip { font-size: 0.65rem; padding: 3px 8px; border-radius: 3px; background: #252540; color: #aaa; }
+        .prim-chip.active { background: #00d4ff22; color: #00d4ff; border: 1px solid #00d4ff44; }
+
+        .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; font-size: 0.85rem; transition: all 0.15s; }
+        .btn-primary { background: #00d4ff; color: #0f0f1a; }
+        .btn-primary:hover { background: #00b8d9; }
+        .btn-danger { background: #e74c3c; color: #fff; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-secondary { background: #252540; color: #aaa; }
+        .btn-secondary:hover { background: #333355; color: #fff; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .controls-row { display: flex; gap: 8px; margin-top: 12px; }
+
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+        .stat-card { background: #12121f; padding: 12px; border-radius: 6px; text-align: center; }
+        .stat-num { font-size: 1.5rem; font-weight: 700; color: #00d4ff; }
+        .stat-label { font-size: 0.75rem; color: #666; margin-top: 2px; }
+
+        .recordings { max-height: 300px; overflow-y: auto; }
+        .rec-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-bottom: 1px solid #252540; cursor: pointer; border-radius: 4px; }
+        .rec-row:hover { background: #252540; }
+        .rec-row.selected { background: #00d4ff15; border: 1px solid #00d4ff33; }
+        .rec-gesture { font-weight: 600; font-size: 0.9rem; }
+        .rec-meta { font-size: 0.75rem; color: #666; }
+
+        .ws-indicator { display: inline-flex; align-items: center; gap: 5px; font-size: 0.75rem; padding: 4px 10px; border-radius: 4px; }
+        .ws-indicator.on { background: #27ae6022; color: #2ecc71; }
+        .ws-indicator.off { background: #e74c3c22; color: #e74c3c; }
+        .ws-dot { width: 6px; height: 6px; border-radius: 50%; }
+        .ws-dot.on { background: #2ecc71; }
+        .ws-dot.off { background: #e74c3c; }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>Hand Motion Pipeline</h1>
-            <p class="subtitle">AI-Powered Gesture Recognition & Sign Language Infrastructure</p>
+            <p class="subtitle">Real-time gesture recognition powered by MediaPipe + ML</p>
         </header>
 
-        <div class="grid">
-            <div class="card">
-                <h2>System Status</h2>
-                <div class="status" id="health-status">Checking...</div>
-                <div class="stat">
-                    <span>Version</span>
-                    <span class="stat-value">0.7.0</span>
-                </div>
-                <div class="stat">
-                    <span>AI Models</span>
-                    <span class="stat-value">Available</span>
-                </div>
-            </div>
-
-            <div class="card">
-                <h2>Dataset Statistics</h2>
-                <div id="stats-loading">Loading...</div>
-                <div id="stats-content" style="display:none;">
-                    <div class="stat">
-                        <span>Total Recordings</span>
-                        <span class="stat-value" id="stat-total">-</span>
+        <div class="main-grid">
+            <div>
+                <div class="card">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                        <h2 style="margin:0;">Camera Feed</h2>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <span class="ws-indicator off" id="ws-badge"><span class="ws-dot off" id="ws-dot"></span><span id="ws-text">Disconnected</span></span>
+                            <span class="fps-badge" id="fps-display">-- FPS</span>
+                        </div>
                     </div>
-                    <div class="stat">
-                        <span>Total Size</span>
-                        <span class="stat-value" id="stat-size">-</span>
+                    <div class="camera-area" id="camera-area">
+                        <video id="local-video" autoplay playsinline muted></video>
+                        <canvas id="overlay-canvas"></canvas>
+                        <div class="camera-placeholder" id="placeholder">
+                            <svg width="48" height="48" fill="none" stroke="#444" stroke-width="2" viewBox="0 0 24 24"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+                            <p>Click <b>Start Camera</b> to begin</p>
+                        </div>
+                    </div>
+                    <div class="controls-row">
+                        <button class="btn btn-primary" id="btn-start" onclick="startCamera()">Start Camera</button>
+                        <button class="btn btn-danger" id="btn-stop" onclick="stopCamera()" disabled>Stop</button>
+                        <button class="btn btn-secondary" id="btn-snapshot" onclick="takeSnapshot()" disabled>Snapshot</button>
                     </div>
                 </div>
-            </div>
 
-            <div class="card">
-                <h2>Quick Actions</h2>
-                <a href="/api/recordings" class="btn">View Recordings</a>
-                <a href="/api/gestures" class="btn btn-secondary">List Gestures</a>
-                <a href="/api/stats" class="btn btn-secondary">API Stats</a>
-            </div>
-
-            <div class="card">
-                <h2>Available Gestures</h2>
-                <div id="gestures-loading">Loading...</div>
-                <div id="gestures-content" style="display:none;"></div>
-            </div>
-
-            <div class="card" style="grid-column: span 2;">
-                <h2>Recent Recordings</h2>
-                <div class="recording-list" id="recordings-list">
-                    <div>Loading...</div>
+                <div class="card" style="margin-top:12px;">
+                    <h2>Gesture Timeline</h2>
+                    <div class="primitive-bar" id="timeline"></div>
                 </div>
             </div>
-        </div>
 
-        <div class="api-info">
-            <strong>API Endpoints:</strong><br>
-            <code>GET /api/health</code> - Health check<br>
-            <code>GET /api/recordings</code> - List recordings<br>
-            <code>GET /api/recording/{filename}</code> - Get recording<br>
-            <code>GET /api/analyze/{filename}</code> - Analyze recording<br>
-            <code>GET /api/validate/{filename}</code> - Validate recording<br>
-            <code>GET /api/stats</code> - Dataset statistics<br>
-            <code>GET /api/gestures</code> - List gestures
+            <div class="side-panel">
+                <div class="card">
+                    <h2>Detected Gesture</h2>
+                    <div class="gesture-big" id="gesture-name">--</div>
+                    <div class="gesture-confidence" id="gesture-conf"></div>
+                    <div class="fingers-row" id="fingers-display"></div>
+                    <div class="finger-labels"><span>T</span><span>I</span><span>M</span><span>R</span><span>P</span></div>
+                </div>
+
+                <div class="card">
+                    <h2>Hand Features</h2>
+                    <div class="feat-grid">
+                        <div class="feat-item"><div class="feat-label">Openness</div><div class="feat-val" id="f-open">--</div></div>
+                        <div class="feat-item"><div class="feat-label">Pinch</div><div class="feat-val" id="f-pinch">--</div></div>
+                        <div class="feat-item"><div class="feat-label">Span</div><div class="feat-val" id="f-span">--</div></div>
+                        <div class="feat-item"><div class="feat-label">Velocity</div><div class="feat-val" id="f-vel">--</div></div>
+                        <div class="feat-item"><div class="feat-label">Palm X</div><div class="feat-val" id="f-px">--</div></div>
+                        <div class="feat-item"><div class="feat-label">Palm Y</div><div class="feat-val" id="f-py">--</div></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Session Stats</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-num" id="s-frames">0</div><div class="stat-label">Frames</div></div>
+                        <div class="stat-card"><div class="stat-num" id="s-gestures">0</div><div class="stat-label">Unique</div></div>
+                        <div class="stat-card"><div class="stat-num" id="s-latency">--</div><div class="stat-label">Latency</div></div>
+                        <div class="stat-card"><div class="stat-num" id="s-dataset">--</div><div class="stat-label">Recordings</div></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Recordings</h2>
+                    <div class="recordings" id="rec-list"><div style="padding:12px;color:#555;">Loading...</div></div>
+                    <div class="controls-row" style="margin-top:8px;">
+                        <button class="btn btn-secondary" style="flex:1;" onclick="playSelected()">Play</button>
+                        <button class="btn btn-danger" style="flex:1;" onclick="stopPlayback()">Stop</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
     <script>
-        // Load health status
-        fetch('/api/health')
-            .then(r => r.json())
-            .then(data => {
-                document.getElementById('health-status').innerHTML = `Status: ${data.status}`;
-                document.getElementById('health-status').className = 'status ok';
-            })
-            .catch(() => {
-                document.getElementById('health-status').innerHTML = 'Status: Error';
-                document.getElementById('health-status').className = 'status error';
-            });
+    const VIDEO_FPS = 15;
+    const JPEG_QUALITY = 0.6;
+    const FRAME_INTERVAL = 1000 / VIDEO_FPS;
 
-        // Load stats
-        fetch('/api/stats')
-            .then(r => r.json())
-            .then(data => {
-                document.getElementById('stats-loading').style.display = 'none';
-                document.getElementById('stats-content').style.display = 'block';
-                document.getElementById('stat-total').textContent = data.total_recordings;
-                document.getElementById('stat-size').textContent = data.total_size_mb + ' MB';
-            });
+    let socket = null;
+    let localStream = null;
+    let videoEl = null;
+    let canvasEl = null;
+    let ctx = null;
+    let sendTimer = null;
+    let selectedRec = null;
+    let frameCount = 0;
+    let lastFpsTime = Date.now();
+    let fpsCounter = 0;
+    let timelinePrims = [];
 
-        // Load gestures
-        fetch('/api/gestures')
-            .then(r => r.json())
-            .then(data => {
-                document.getElementById('gestures-loading').style.display = 'none';
-                document.getElementById('gestures-content').style.display = 'block';
-                document.getElementById('gestures-content').innerHTML = data.gestures.map(g =>
-                    `<span class="gesture-badge">${g}</span>`
-                ).join(' ');
-            });
+    function initSocket() {
+        socket = io({ transports: ['websocket'] });
 
-        // Load recordings
-        fetch('/api/recordings')
-            .then(r => r.json())
-            .then(data => {
-                const list = document.getElementById('recordings-list');
-                if (data.recordings.length === 0) {
-                    list.innerHTML = '<div style="padding:20px;text-align:center;color:#888;">No recordings yet</div>';
-                    return;
-                }
-                list.innerHTML = data.recordings.map(r => `
-                    <div class="recording-item">
-                        <div>
-                            <strong>${r.gesture}</strong>
-                            <div style="font-size:0.85rem;color:#888;">${r.frames} frames | ${r.duration.toFixed(1)}s</div>
-                        </div>
-                        <span class="gesture-badge">${r.filename}</span>
-                    </div>
-                `).join('');
+        socket.on('connect', () => {
+            setWsStatus(true);
+            loadRecordings();
+        });
+        socket.on('disconnect', () => setWsStatus(false));
+
+        socket.on('frame_result', (data) => {
+            const latency = Date.now() - (data.client_ts || Date.now());
+            document.getElementById('s-latency').textContent = latency + 'ms';
+
+            if (data.landmarks && data.landmarks.length >= 42) {
+                drawSkeleton(data.landmarks);
+                updateGesture(data.gesture, data.confidence);
+                updateFingers(data.fingers);
+                updateFeatures(data.features, data.velocity);
+                updateTimeline(data.gesture);
+            } else {
+                clearOverlay();
+                updateGesture('No hand', 0);
+                updateFingers([]);
+            }
+
+            fpsCounter++;
+            const now = Date.now();
+            if (now - lastFpsTime >= 1000) {
+                document.getElementById('fps-display').textContent = fpsCounter + ' FPS';
+                fpsCounter = 0;
+                lastFpsTime = now;
+            }
+        });
+
+        socket.on('playback_frame', (data) => {
+            if (data.landmarks && data.landmarks.length >= 42) {
+                drawSkeleton(data.landmarks);
+                updateGesture(data.primitive, 0);
+                updateFingers(data.finger_states);
+                if (data.features) updateFeatures(data.features, data.velocity);
+            }
+        });
+
+        socket.on('playback_started', () => console.log('Playback started'));
+        socket.on('playback_finished', () => { clearOverlay(); console.log('Playback done'); });
+    }
+
+    function setWsStatus(connected) {
+        const badge = document.getElementById('ws-badge');
+        const dot = document.getElementById('ws-dot');
+        const text = document.getElementById('ws-text');
+        badge.className = 'ws-indicator ' + (connected ? 'on' : 'off');
+        dot.className = 'ws-dot ' + (connected ? 'on' : 'off');
+        text.textContent = connected ? 'Connected' : 'Disconnected';
+    }
+
+    async function startCamera() {
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({
+                video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
             });
+            videoEl = document.getElementById('local-video');
+            videoEl.srcObject = localStream;
+            await videoEl.play();
+
+            canvasEl = document.getElementById('overlay-canvas');
+            canvasEl.width = videoEl.videoWidth || 640;
+            canvasEl.height = videoEl.videoHeight || 480;
+            ctx = canvasEl.getContext('2d');
+
+            document.getElementById('placeholder').style.display = 'none';
+            document.getElementById('btn-start').disabled = true;
+            document.getElementById('btn-stop').disabled = false;
+            document.getElementById('btn-snapshot').disabled = false;
+
+            sendTimer = setInterval(captureAndSend, FRAME_INTERVAL);
+        } catch (err) {
+            alert('Camera error: ' + err.message);
+        }
+    }
+
+    function stopCamera() {
+        if (sendTimer) { clearInterval(sendTimer); sendTimer = null; }
+        if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+        clearOverlay();
+        document.getElementById('placeholder').style.display = 'flex';
+        document.getElementById('btn-start').disabled = false;
+        document.getElementById('btn-stop').disabled = true;
+        document.getElementById('btn-snapshot').disabled = true;
+        document.getElementById('fps-display').textContent = '-- FPS';
+    }
+
+    function captureAndSend() {
+        if (!videoEl || !localStream || !socket || !socket.connected) return;
+        if (videoEl.readyState < 2) return;
+
+        const w = videoEl.videoWidth || 640;
+        const h = videoEl.videoHeight || 480;
+
+        const tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width = w;
+        tmpCanvas.height = h;
+        const tmpCtx = tmpCanvas.getContext('2d');
+        tmpCtx.drawImage(videoEl, 0, 0, w, h);
+
+        const dataUrl = tmpCanvas.toDataURL('image/jpeg', JPEG_QUALITY);
+        const base64 = dataUrl.split(',')[1];
+
+        frameCount++;
+        document.getElementById('s-frames').textContent = frameCount;
+
+        socket.emit('process_frame', {
+            image: base64,
+            width: w,
+            height: h,
+            client_ts: Date.now(),
+            frame_num: frameCount,
+        });
+    }
+
+    function drawSkeleton(lm) {
+        if (!ctx || !canvasEl) return;
+        ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+        const sx = canvasEl.width / 640;
+        const sy = canvasEl.height / 480;
+
+        const connections = [
+            [0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
+            [0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],
+            [0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]
+        ];
+
+        ctx.strokeStyle = '#00d4ff';
+        ctx.lineWidth = 2;
+        for (const [a, b] of connections) {
+            const ax = lm[a*2] * sx, ay = lm[a*2+1] * sy;
+            const bx = lm[b*2] * sx, by = lm[b*2+1] * sy;
+            ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+        }
+
+        ctx.fillStyle = '#fff';
+        for (let i = 0; i < 21; i++) {
+            const x = lm[i*2] * sx, y = lm[i*2+1] * sy;
+            ctx.beginPath(); ctx.arc(x, y, [4,8,12,16,20].includes(i) ? 5 : 3, 0, Math.PI*2); ctx.fill();
+        }
+
+        ctx.fillStyle = '#2ecc71';
+        for (const t of [4,8,12,16,20]) {
+            const x = lm[t*2] * sx, y = lm[t*2+1] * sy;
+            ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI*2); ctx.fill();
+        }
+    }
+
+    function clearOverlay() { if (ctx) ctx.clearRect(0, 0, canvasEl.width, canvasEl.height); }
+
+    function updateGesture(name, conf) {
+        document.getElementById('gesture-name').textContent = name || '--';
+        document.getElementById('gesture-conf').textContent = conf > 0 ? (conf * 100).toFixed(0) + '% confidence' : '';
+    }
+
+    function updateFingers(fingers) {
+        const el = document.getElementById('fingers-display');
+        if (!fingers || fingers.length === 0) { el.innerHTML = ''; return; }
+        el.innerHTML = fingers.map((f, i) =>
+            `<div class="finger-pip ${f ? 'on' : ''}" title="${['Thumb','Index','Middle','Ring','Pinky'][i]}"></div>`
+        ).join('');
+    }
+
+    function updateFeatures(features, velocity) {
+        if (!features) return;
+        const f = features;
+        document.getElementById('f-open').textContent = f.hand_openness != null ? f.hand_openness.toFixed(2) : '--';
+        document.getElementById('f-pinch').textContent = f.pinch_distance != null ? f.pinch_distance.toFixed(0) + 'px' : '--';
+        document.getElementById('f-span').textContent = f.hand_span != null ? f.hand_span.toFixed(0) + 'px' : '--';
+        if (f.palm_center) {
+            document.getElementById('f-px').textContent = f.palm_center.x != null ? f.palm_center.x.toFixed(0) : '--';
+            document.getElementById('f-py').textContent = f.palm_center.y != null ? f.palm_center.y.toFixed(0) : '--';
+        }
+        if (velocity) {
+            document.getElementById('f-vel').textContent = velocity.magnitude != null ? velocity.magnitude.toFixed(0) + 'px/s' : '--';
+        }
+    }
+
+    function updateTimeline(prim) {
+        if (!prim || prim === 'UNKNOWN') return;
+        if (timelinePrims.length === 0 || timelinePrims[timelinePrims.length - 1] !== prim) {
+            timelinePrims.push(prim);
+            if (timelinePrims.length > 30) timelinePrims.shift();
+        }
+        const el = document.getElementById('timeline');
+        el.innerHTML = timelinePrims.map(p => {
+            const colors = {
+                POINT:'#ff8c00',OPEN_HAND:'#2ecc71',FIST:'#e74c3c',PEACE:'#9b59b6',
+                THUMBS_UP:'#f1c40f',PINCH:'#e67e22',WAVE:'#8e44ad',CIRCLE:'#1abc9c',
+                GRAB:'#e74c3c',PUSH:'#3498db',SWIPE_LEFT:'#e67e22',SWIPE_RIGHT:'#e67e22',
+            };
+            return `<span class="prim-chip" style="background:${colors[p]||'#333'}22;color:${colors[p]||'#aaa'};border:1px solid ${colors[p]||'#333'}44">${p}</span>`;
+        }).join('');
+    }
+
+    function takeSnapshot() {
+        if (!videoEl || !localStream) return;
+        const c = document.createElement('canvas');
+        c.width = videoEl.videoWidth; c.height = videoEl.videoHeight;
+        c.getContext('2d').drawImage(videoEl, 0, 0);
+        const a = document.createElement('a');
+        a.href = c.toDataURL('image/png');
+        a.download = 'snapshot_' + Date.now() + '.png';
+        a.click();
+    }
+
+    async function loadRecordings() {
+        try {
+            const r = await fetch('/api/recordings');
+            const data = await r.json();
+            const el = document.getElementById('rec-list');
+            document.getElementById('s-dataset').textContent = data.count;
+            if (!data.recordings.length) { el.innerHTML = '<div style="padding:12px;color:#555;">No recordings</div>'; return; }
+            el.innerHTML = data.recordings.map(rec =>
+                `<div class="rec-row" onclick="selectRec(this,'${rec.filename}')" data-file="${rec.filename}">
+                    <div><div class="rec-gesture">${rec.gesture}</div><div class="rec-meta">${rec.frames}f / ${rec.duration.toFixed(1)}s</div></div>
+                </div>`
+            ).join('');
+        } catch(e) { console.error(e); }
+    }
+
+    function selectRec(el, file) {
+        document.querySelectorAll('.rec-row').forEach(e => e.classList.remove('selected'));
+        el.classList.add('selected');
+        selectedRec = file;
+    }
+
+    function playSelected() {
+        if (!selectedRec || !socket || !socket.connected) return alert('Select a recording first');
+        socket.emit('play_recording', { filename: selectedRec, speed: 1.0 });
+    }
+
+    function stopPlayback() { if (socket) socket.emit('stop_playback'); }
+
+    window.addEventListener('load', () => { initSocket(); loadRecordings(); });
     </script>
 </body>
 </html>
