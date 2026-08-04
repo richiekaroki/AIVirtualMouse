@@ -85,7 +85,10 @@
                         <div class="onboard-dot" id="ob-dot-1"></div>
                         <div class="onboard-dot" id="ob-dot-2"></div>
                     </div>
-                    <button class="onboard-skip" onclick="skipOnboarding()">Skip tour</button>
+                    <div class="onboard-actions">
+                        <button class="onboard-btn" onclick="skipOnboarding()">Skip</button>
+                        <button class="onboard-btn onboard-btn-primary" onclick="advanceOnboarding()">Next</button>
+                    </div>
                 </div>
                 <div class="cam-empty" id="placeholder">
                     <div class="cam-empty-icon">
@@ -129,11 +132,11 @@
                 </button>
             </div>
             <div class="gesture-strip">
-                <button class="gesture-strip-toggle" onclick="this.classList.toggle('open');const g=document.getElementById('gesture-strip-grid');g.classList.toggle('open');this.setAttribute('aria-expanded',g.classList.contains('open'))" aria-expanded="false" aria-controls="gesture-strip-grid">
+                <button class="gesture-strip-toggle open" onclick="this.classList.toggle('open');const g=document.getElementById('gesture-strip-grid');g.classList.toggle('open');this.setAttribute('aria-expanded',g.classList.contains('open'))" aria-expanded="true" aria-controls="gesture-strip-grid">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
                     Try these gestures
                 </button>
-                <div class="gesture-strip-grid" id="gesture-strip-grid">
+                <div class="gesture-strip-grid open" id="gesture-strip-grid">
                     <div class="gesture-chip"><span>&#x270B;</span> Open Hand</div>
                     <div class="gesture-chip"><span>&#x270A;</span> Fist</div>
                     <div class="gesture-chip"><span>&#x261D;</span> Point</div>
@@ -150,6 +153,7 @@
         <div class="panel">
             <div class="gesture-section">
                 <div class="gesture-ring" id="gesture-ring"></div>
+                <div class="section-label">Gesture</div>
                 <div class="gesture-word idle" id="gesture-name">--</div>
                 <div class="gesture-meta">
                     <span id="gesture-conf"></span>
@@ -170,6 +174,7 @@
             </div>
 
             <div class="fingers-section">
+                <div class="section-label">Fingers</div>
                 <div class="fingers-row" id="fingers-display">
                     <div class="f-dot idle">T</div><div class="f-dot idle">I</div><div class="f-dot idle">M</div><div class="f-dot idle">R</div><div class="f-dot idle">P</div>
                 </div>
@@ -177,6 +182,7 @@
             </div>
 
             <div class="feat-section">
+                <div class="section-label">Features</div>
                 <div class="feat-row">
                     <div class="feat-chip" data-tip="Hand openness (0–1)"><span class="k">Open</span><span class="v idle" id="f-open">--</span></div>
                     <div class="feat-chip" data-tip="Thumb-index tip distance (px)"><span class="k">Pinch</span><span class="v idle" id="f-pinch">--</span></div>
@@ -186,6 +192,7 @@
             </div>
 
             <div class="feat-section" id="face-section" style="display:none">
+                <div class="section-label">Face</div>
                 <div class="feat-row">
                     <div class="feat-chip face-chip" data-tip="Facial expression"><span class="k">Face</span><span class="v" id="face-expr">--</span></div>
                     <div class="feat-chip face-chip" data-tip="Eye state (open/closed)"><span class="k">Eyes</span><span class="v" id="face-eyes">--</span></div>

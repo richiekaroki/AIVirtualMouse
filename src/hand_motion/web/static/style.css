@@ -234,12 +234,20 @@ body::after {
 }
 .onboard-dot.done { background: var(--accent); }
 .onboard-dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-.onboard-skip {
-    background: none; border: none; color: var(--text-3); cursor: pointer;
-    font-family: var(--font-mono); font-size: 0.55rem; margin-top: 2px;
-    transition: color 150ms;
+.onboard-actions { display: flex; gap: 8px; margin-top: 6px; }
+.onboard-btn {
+    padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border-strong);
+    background: var(--elevated); color: var(--text-2);
+    font-family: var(--font-mono); font-size: 0.6rem; font-weight: 500;
+    cursor: pointer; transition: all 150ms var(--ease);
 }
-.onboard-skip:hover { color: var(--text); }
+.onboard-btn:hover { background: var(--raised); color: var(--text); border-color: var(--text-3); }
+.onboard-btn-primary {
+    background: linear-gradient(135deg, var(--accent), #D97706);
+    color: var(--bg); border-color: transparent;
+    box-shadow: 0 2px 8px rgba(245,158,11,0.25);
+}
+.onboard-btn-primary:hover { box-shadow: 0 4px 12px rgba(245,158,11,0.35); transform: translateY(-1px); }
 .cam-tag {
     font-family: var(--font-mono); font-size: 0.58rem; font-weight: 600;
     padding: 4px 10px; border-radius: 6px;
@@ -561,12 +569,26 @@ body::after {
 .sound-btn svg { width: 14px; height: 14px; }
 
 /* ── Idle states ── */
-.gesture-word.idle { color: var(--text-3); opacity: 0.45; }
+.gesture-word.idle { color: var(--text-3); opacity: 0.45; animation: breathe 3s ease-in-out infinite; }
 .hand-badge.idle { opacity: 0.35; }
 .ml-row.idle { opacity: 0.35; }
 .feat-chip .v.idle { color: var(--text-3); opacity: 0.35; }
-.f-dot.idle { opacity: 0.3; border-style: dashed; }
+.f-dot.idle { opacity: 0.3; border-style: dashed; animation: breathe-dot 3s ease-in-out infinite; }
 .rec-empty.idle { opacity: 0.45; }
+@keyframes breathe { 0%,100% { opacity: 0.45; } 50% { opacity: 0.6; } }
+@keyframes breathe-dot { 0%,100% { opacity: 0.3; } 50% { opacity: 0.45; } }
+.panel-idle-prompt {
+    padding: 16px 20px; text-align: center;
+    font-family: var(--font-mono); font-size: 0.6rem; color: var(--text-3);
+    border-bottom: 1px solid var(--border);
+    opacity: 0.6;
+}
+.panel-idle-prompt span { color: var(--accent); font-weight: 600; }
+.section-label {
+    font-family: var(--font-mono); font-size: 0.48rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1px; color: var(--text-3);
+    opacity: 0.5; margin-bottom: 6px;
+}
 
 /* ── Reduced Motion ── */
 @media (prefers-reduced-motion: reduce) {
