@@ -157,7 +157,8 @@ class InferenceEngine:
         sequence_length: int = 30,
         feature_dim: int = 63,
         smoothing_window: int = 5,
-        confidence_threshold: float = 0.5
+        confidence_threshold: float = 0.5,
+        ema_alpha: float = 0.3
     ):
         """
         Initialize inference engine.
@@ -168,18 +169,25 @@ class InferenceEngine:
             feature_dim: Dimension of feature vector
             smoothing_window: Window size for result smoothing
             confidence_threshold: Minimum confidence for prediction
+            ema_alpha: EMA smoothing factor (0-1, lower = smoother)
         """
         self.classifier = classifier
         self.sequence_length = sequence_length
         self.feature_dim = feature_dim
         self.smoothing_window = smoothing_window
         self.confidence_threshold = confidence_threshold
+        self.ema_alpha = ema_alpha
 
         self.frame_buffer = FrameBuffer(sequence_length, feature_dim)
         self.performance = PerformanceMonitor()
 
         # Result smoothing
         self.recent_results = deque(maxlen=smoothing_window)
+
+        # EMA state
+        self._ema_confidence: float = 0.0
+        self._ema_gesture: Optional[str] = None
+        self._ema_initialised: bool = False
 
         # Callbacks
         self.on_gesture_detected: Optional[Callable] = None
@@ -253,36 +261,44 @@ class InferenceEngine:
         return smoothed
 
     def _smooth_results(self) -> Optional[InferenceResult]:
-        """Smooth recent results using majority voting."""
+        """Smooth recent results using majority voting + EMA confidence."""
         if not self.recent_results:
             return None
 
-        # Get most recent result
         latest = self.recent_results[-1]
 
-        # Count gesture occurrences in window
+        # Majority voting for gesture label
         gesture_counts = {}
         for result in self.recent_results:
             gesture = result.gesture
             gesture_counts[gesture] = gesture_counts.get(gesture, 0) + 1
 
-        # Find majority gesture
+        majority_gesture = latest.gesture
         if gesture_counts:
-            majority_gesture = max(gesture_counts, key=gesture_counts.get)
-            majority_count = gesture_counts[majority_gesture]
+            mg = max(gesture_counts, key=gesture_counts.get)
+            if gesture_counts[mg] >= len(self.recent_results) * 0.6:
+                majority_gesture = mg
 
-            # Update result if majority agrees
-            if majority_count >= len(self.recent_results) * 0.6:
-                latest = InferenceResult(
-                    gesture=majority_gesture,
-                    confidence=latest.confidence,
-                    timestamp=latest.timestamp,
-                    latency_ms=latest.latency_ms,
-                    frame_number=latest.frame_number,
-                    all_probs=latest.all_probs
-                )
+        # EMA smoothing for confidence
+        raw_conf = latest.confidence
+        if not self._ema_initialised:
+            self._ema_confidence = raw_conf
+            self._ema_gesture = majority_gesture
+            self._ema_initialised = True
+        else:
+            self._ema_confidence = self.ema_alpha * raw_conf + (1 - self.ema_alpha) * self._ema_confidence
+            # Only update gesture if EMA confidence is above threshold
+            if self._ema_confidence >= self.confidence_threshold:
+                self._ema_gesture = majority_gesture
 
-        return latest
+        return InferenceResult(
+            gesture=self._ema_gesture or majority_gesture,
+            confidence=self._ema_confidence,
+            timestamp=latest.timestamp,
+            latency_ms=latest.latency_ms,
+            frame_number=latest.frame_number,
+            all_probs=latest.all_probs
+        )
 
     def get_performance_stats(self) -> Dict[str, float]:
         """Get current performance statistics."""
@@ -292,6 +308,9 @@ class InferenceEngine:
         """Reset the inference engine state."""
         self.frame_buffer.clear()
         self.recent_results.clear()
+        self._ema_confidence = 0.0
+        self._ema_gesture = None
+        self._ema_initialised = False
         self.frame_number = 0
 
     def start(self) -> None:
