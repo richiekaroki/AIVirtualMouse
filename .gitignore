@@ -51,10 +51,11 @@ htmlcov/
 analysis_plots/
 server.log
 dataset_summary.md
+motion_data/*.json
 
 # Build artifacts
 *.spec
 *.pyd
-
-# Keep ML model in models/
+*.task
+!src/hand_landmarker.task
 !models/hand_landmarker.task
