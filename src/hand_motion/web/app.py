@@ -229,6 +229,18 @@ def register_routes(app: Flask) -> None:
             "data_directory": str(data_dir),
         })
 
+    @app.route("/api/diagnostics")
+    def get_diagnostics():
+        return jsonify({
+            "detector_ready": _detector is not None,
+            "classifier_ready": _classifier is not None and getattr(_classifier, 'is_trained', False),
+            "face_analyzer_ready": _face_analyzer is not None and _face_analyzer is not False,
+            "frames_processed": _server_frame_counter,
+            "last_process_ms": round(_last_process_time * 1000) if _last_process_time else 0,
+            "frame_skip_every": _FRAME_SKIP_EVERY,
+            "active_streams": len([s for s in _camera_streams.values() if s.get("active")]),
+        })
+
     @app.route("/api/gestures")
     def list_gestures():
         gestures = [
@@ -249,6 +261,11 @@ _face_analyzer = None
 _server_frame_counter = 0
 _mediapipe_lock = threading.Lock()
 
+# Performance: skip frames on slow servers
+_frame_skip_counter = 0
+_FRAME_SKIP_EVERY = 2  # process every 2nd frame on free tier
+_last_process_time = 0.0
+
 
 class _Suppress_stderr:
     """Suppress C++ level MediaPipe/TensorFlow warnings written to stderr."""
@@ -267,7 +284,7 @@ def _get_detector():
     if _detector is None:
         from hand_motion.detection import HandDetector
         from hand_motion.descriptor import MotionDescriptor
-        _detector = HandDetector(detectionCon=0.7)
+        _detector = HandDetector(detectionCon=0.5)
         _descriptor = MotionDescriptor()
     if _classifier is None:
         from hand_motion.ai.landmark_classifier import LandmarkClassifier
@@ -304,7 +321,7 @@ def register_socket_handlers(app: Flask) -> None:
     @socketio.on("process_frame")
     def handle_process_frame(data):
         """Receive a frame from the browser, run MediaPipe, return gesture results."""
-        global _server_frame_counter
+        global _server_frame_counter, _frame_skip_counter, _last_process_time
         try:
             import cv2
             import numpy as np
@@ -318,6 +335,22 @@ def register_socket_handlers(app: Flask) -> None:
                 emit("frame_result", {"error": "No image data"})
                 return
 
+            # Frame skipping: if server is slow, skip frames to keep up
+            _frame_skip_counter += 1
+            if _frame_skip_counter % _FRAME_SKIP_EVERY != 0:
+                # Return last known result for skipped frames
+                emit("frame_result", {
+                    "frame": _server_frame_counter,
+                    "client_ts": client_ts,
+                    "hands_detected": False,
+                    "hands_count": 0,
+                    "hands": [],
+                    "face": None,
+                    "skipped": True,
+                })
+                return
+
+            t0 = time.time()
             img_bytes = base64.b64decode(img_b64)
             nparr = np.frombuffer(img_bytes, np.uint8)
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -347,13 +380,18 @@ def register_socket_handlers(app: Flask) -> None:
 
             hands_count = detector.getHandsCount()
 
+            t1 = time.time()
+            _last_process_time = t1 - t0
+
             result = {
                 "frame": _server_frame_counter,
                 "client_ts": client_ts,
+                "server_ts": int(t1 * 1000),
                 "hands_detected": hands_count > 0,
                 "hands_count": hands_count,
                 "hands": [],
                 "face": None,
+                "process_ms": round((t1 - t0) * 1000),
             }
 
             # Attach non-manual markers if face analysis succeeded
@@ -421,8 +459,8 @@ def register_socket_handlers(app: Flask) -> None:
             emit("frame_result", result)
 
         except Exception as e:
-            logger.error("Frame processing error: %s", e)
-            emit("frame_result", {"error": "Frame processing failed"})
+            logger.error("Frame processing error: %s", e, exc_info=True)
+            emit("frame_result", {"error": str(e)[:200], "hands_detected": False, "hands_count": 0, "hands": []})
 
     @socketio.on("start_camera")
     def handle_start_camera(data):

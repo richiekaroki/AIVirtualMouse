@@ -1,4 +1,4 @@
-const VIDEO_FPS = 15, JPEG_QUALITY = 0.6, FRAME_INTERVAL = 1000 / VIDEO_FPS;
+const VIDEO_FPS = 10, JPEG_QUALITY = 0.5, FRAME_INTERVAL = 1000 / VIDEO_FPS;
 let socket, localStream, videoEl, canvasEl, ctx, sendTimer, selectedRec = null;
 let frameCount = 0, lastFpsTime = Date.now(), fpsCounter = 0;
 let uniqueGestures = new Set();
@@ -7,6 +7,15 @@ let sessionStart = 0, sessionTimer = null, uniqueGestureCount = 0;
 let onboardStep = -1, onboardActive = false;
 let lastDetectedGesture = null;
 let soundEnabled = false, audioCtx = null;
+
+/* ── Virtual Mouse / Cursor Control ── */
+let cursorMode = false;
+let cursorX = 0, cursorY = 0;
+let cursorSmoothX = 0, cursorSmoothY = 0;
+let cursorClicking = false;
+let lastClickTime = 0;
+const SMOOTHING = 0.35;
+const CLICK_COOLDOWN = 400;
 
 function toggleSound() {
     soundEnabled = !soundEnabled;
@@ -32,6 +41,76 @@ function playGestureSound(freq, dur) {
     osc.start();
     osc.stop(audioCtx.currentTime + dur);
 }
+
+/* ── Virtual Mouse Functions ── */
+function toggleCursorMode() {
+    cursorMode = !cursorMode;
+    const btn = document.getElementById('btn-cursor');
+    const indicator = document.getElementById('cursor-indicator');
+    btn.classList.toggle('on', cursorMode);
+    if (cursorMode) {
+        indicator.style.display = '';
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg> Cursor ON';
+    } else {
+        indicator.style.display = 'none';
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg> Cursor';
+    }
+}
+
+function updateCursor(landmarks) {
+    if (!cursorMode || !landmarks || landmarks.length < 42) return;
+    const indexTipX = landmarks[8 * 2];
+    const indexTipY = landmarks[8 * 2 + 1];
+    const screenW = window.innerWidth;
+    const screenH = window.innerHeight;
+    const targetX = (1 - indexTipX / 640) * screenW;
+    const targetY = (indexTipY / 480) * screenH;
+    cursorSmoothX += (targetX - cursorSmoothX) * SMOOTHING;
+    cursorSmoothY += (targetY - cursorSmoothY) * SMOOTHING;
+    cursorX = cursorSmoothX;
+    cursorY = cursorSmoothY;
+    moveCursorIndicator(cursorX, cursorY);
+    checkClickGesture(landmarks);
+}
+
+function moveCursorIndicator(x, y) {
+    const el = document.getElementById('cursor-indicator');
+    if (!el) return;
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+}
+
+function checkClickGesture(lm) {
+    const indexTip = [lm[8 * 2], lm[8 * 2 + 1]];
+    const middleTip = [lm[12 * 2], lm[12 * 2 + 1]];
+    const dist = Math.hypot(indexTip[0] - middleTip[0], indexTip[1] - middleTip[1]);
+    const now = Date.now();
+    if (dist < 30 && !cursorClicking && now - lastClickTime > CLICK_COOLDOWN) {
+        cursorClicking = true;
+        lastClickTime = now;
+        fireClickAt(cursorX, cursorY);
+    } else if (dist > 50) {
+        cursorClicking = false;
+    }
+}
+
+function fireClickAt(x, y) {
+    const target = document.elementFromPoint(x, y);
+    if (target) {
+        target.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: x, clientY: y }));
+        const ring = document.getElementById('cursor-click-ring');
+        if (ring) {
+            ring.style.left = x + 'px';
+            ring.style.top = y + 'px';
+            ring.style.display = '';
+            ring.classList.remove('animate');
+            void ring.offsetWidth;
+            ring.classList.add('animate');
+            setTimeout(() => { ring.style.display = 'none'; ring.classList.remove('animate'); }, 500);
+        }
+        playGestureSound(1200, 0.05);
+    }
+}
 const ONBOARD_STEPS = [
     { gesture: 'OPEN_HAND', emoji: '\u{1F590}\uFE0F', name: 'Open Hand', hint: 'Spread all five fingers and hold your hand open' },
     { gesture: 'FIST', emoji: '\u270A', name: 'Fist', hint: 'Close all five fingers into a tight fist' },
@@ -49,6 +128,9 @@ function initSocket() {
         if (ctx) ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
         drawTrail();
         updateParticles();
+        if (d.error) {
+            console.warn('Server error:', d.error);
+        }
         if (d.hands && d.hands.length > 0) {
             // Multi-hand rendering
             d.hands.forEach(hand => {
@@ -71,6 +153,10 @@ function initSocket() {
             updateFingers(primary.fingers);
             updateFeatures(primary.features, primary.velocity);
             updateHandedness(primary.handedness);
+            // Virtual mouse cursor control
+            if (cursorMode && primary.landmarks) {
+                updateCursor(primary.landmarks);
+            }
             // Second hand display
             updateSecondHand(d.hands.length > 1 ? d.hands[1] : null);
         } else if (d.landmarks && d.landmarks.length >= 42) {
@@ -202,6 +288,7 @@ async function startCamera() {
         document.getElementById('btn-stop').disabled = false;
         document.getElementById('btn-snapshot').disabled = false;
         document.getElementById('btn-record').disabled = false;
+        document.getElementById('btn-cursor').disabled = false;
         document.getElementById('live-badge').style.display = '';
         document.getElementById('cam-fps-overlay').classList.add('visible');
         startSession();
@@ -235,6 +322,11 @@ function stopCamera() {
     particles.length = 0;
     trailPoints.length = 0;
     lastDetectedGesture = null;
+    cursorMode = false;
+    document.getElementById('cursor-indicator').style.display = 'none';
+    document.getElementById('cursor-click-ring').style.display = 'none';
+    document.getElementById('btn-cursor').classList.remove('on');
+    document.getElementById('btn-cursor').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg> Cursor';
     document.getElementById('cam-error').classList.remove('visible');
     document.getElementById('placeholder').style.display = '';
     document.getElementById('btn-start').disabled = false;
@@ -261,7 +353,7 @@ function stopCamera() {
 
 function captureAndSend() {
     if (!videoEl || !localStream || !socket || !socket.connected || videoEl.readyState < 2) return;
-    const w = videoEl.videoWidth || 640, h = videoEl.videoHeight || 480;
+    const w = 480, h = 360;
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     c.getContext('2d').drawImage(videoEl, 0, 0, w, h);
     frameCount++;
