@@ -232,13 +232,10 @@ def register_routes(app: Flask) -> None:
     @app.route("/api/diagnostics")
     def get_diagnostics():
         return jsonify({
-            "detector_ready": _detector is not None,
-            "classifier_ready": _classifier is not None and getattr(_classifier, 'is_trained', False),
-            "face_analyzer_ready": _face_analyzer is not None and _face_analyzer is not False,
-            "frames_processed": _server_frame_counter,
-            "last_process_ms": round(_last_process_time * 1000) if _last_process_time else 0,
-            "frame_skip_every": _FRAME_SKIP_EVERY,
+            "architecture": "client_side_detection",
+            "frames_received": _server_frame_counter,
             "active_streams": len([s for s in _camera_streams.values() if s.get("active")]),
+            "active_recordings": len([s for s in _recording_sessions.values() if s.get("active")]),
         })
 
     @app.route("/api/gestures")
@@ -252,54 +249,10 @@ def register_routes(app: Flask) -> None:
 
 # Global state for camera streaming
 _camera_streams: Dict[str, Dict[str, Any]] = {}
+_recording_sessions: Dict[str, Dict[str, Any]] = {}
 
-# Lazily initialized detectors per-thread
-_detector = None
-_descriptor = None
-_classifier = None
-_face_analyzer = None
+# Server frame counter (from client-side detection)
 _server_frame_counter = 0
-_mediapipe_lock = threading.Lock()
-
-# Performance: skip frames on slow servers
-_frame_skip_counter = 0
-_FRAME_SKIP_EVERY = 2  # process every 2nd frame on free tier
-_last_process_time = 0.0
-
-
-class _Suppress_stderr:
-    """Suppress C++ level MediaPipe/TensorFlow warnings written to stderr."""
-    def __enter__(self):
-        self._original = sys.stderr
-        sys.stderr = open(os.devnull, "w")
-        return self
-
-    def __exit__(self, *args):
-        sys.stderr.close()
-        sys.stderr = self._original
-
-
-def _get_detector():
-    global _detector, _descriptor, _classifier, _face_analyzer
-    if _detector is None:
-        from hand_motion.detection import HandDetector
-        from hand_motion.descriptor import MotionDescriptor
-        _detector = HandDetector(detectionCon=0.5)
-        _descriptor = MotionDescriptor()
-    if _classifier is None:
-        from hand_motion.ai.landmark_classifier import LandmarkClassifier
-        _classifier = LandmarkClassifier()
-        if not _classifier.is_trained:
-            data_dir = Path(__file__).parent.parent.parent.parent / "motion_data"
-            _classifier.train_from_directory(str(data_dir))
-    if _face_analyzer is None:
-        try:
-            from hand_motion.face import FacialExpressionAnalyzer
-            _face_analyzer = FacialExpressionAnalyzer()
-        except Exception as e:
-            logger.warning("Face analyzer init failed: %s", e)
-            _face_analyzer = False
-    return _detector, _descriptor, _classifier
 
 
 def register_socket_handlers(app: Flask) -> None:
@@ -320,247 +273,34 @@ def register_socket_handlers(app: Flask) -> None:
 
     @socketio.on("process_frame")
     def handle_process_frame(data):
-        """Receive a frame from the browser, run MediaPipe, return gesture results."""
-        global _server_frame_counter, _frame_skip_counter, _last_process_time
+        """Receive landmarks from client-side MediaPipe, store for recording/playback."""
+        global _server_frame_counter
         try:
-            import cv2
-            import numpy as np
-
-            img_b64 = data.get("image")
+            landmarks = data.get("landmarks")
+            gesture = data.get("gesture")
+            fingers = data.get("fingers")
+            confidence = data.get("confidence", 0)
             width = data.get("width", 640)
             height = data.get("height", 480)
             client_ts = data.get("client_ts", 0)
 
-            if not img_b64:
-                emit("frame_result", {"error": "No image data"})
+            if not landmarks:
                 return
-
-            # Frame skipping: if server is slow, skip frames to keep up
-            _frame_skip_counter += 1
-            if _frame_skip_counter % _FRAME_SKIP_EVERY != 0:
-                # Return last known result for skipped frames
-                emit("frame_result", {
-                    "frame": _server_frame_counter,
-                    "client_ts": client_ts,
-                    "hands_detected": False,
-                    "hands_count": 0,
-                    "hands": [],
-                    "face": None,
-                    "skipped": True,
-                })
-                return
-
-            t0 = time.time()
-            img_bytes = base64.b64decode(img_b64)
-            nparr = np.frombuffer(img_bytes, np.uint8)
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-            if img is None:
-                emit("frame_result", {"error": "Failed to decode image"})
-                return
-
-            detector, descriptor, classifier = _get_detector()
-
-            img = cv2.flip(img, 1)
-
-            # Face analysis for non-manual markers
-            face_result = None
-            if _face_analyzer and _face_analyzer is not False:
-                try:
-                    face_result = _face_analyzer.analyze_frame(img)
-                except Exception:
-                    face_result = None
-
-            with _mediapipe_lock:
-                with _Suppress_stderr():
-                    img = detector.findHands(img, draw=False)
-                    lm_list, bbox = detector.findPosition(img, draw=False)
 
             _server_frame_counter += 1
 
-            hands_count = detector.getHandsCount()
-
-            t1 = time.time()
-            _last_process_time = t1 - t0
-
-            result = {
-                "frame": _server_frame_counter,
-                "client_ts": client_ts,
-                "server_ts": int(t1 * 1000),
-                "hands_detected": hands_count > 0,
-                "hands_count": hands_count,
-                "hands": [],
-                "face": None,
-                "process_ms": round((t1 - t0) * 1000),
-            }
-
-            # Attach non-manual markers if face analysis succeeded
-            if face_result and "error" not in face_result:
-                result["face"] = {
-                    "expression": face_result.get("classified", "neutral"),
-                    "eyes_open": face_result.get("eyes_open", True),
-                    "mouth_open": face_result.get("mouth_open", False),
-                    "eyebrows_raised": face_result.get("eyebrows_raised", False),
-                    "head_orientation": face_result.get("head_orientation", {}),
-                }
-
-            for hand_idx in range(hands_count):
-                lm_list, bbox = detector.findPosition(img, handNo=hand_idx, draw=False)
-                if not lm_list:
-                    continue
-
-                fingers = detector.fingersUp(handNo=hand_idx)
-                handedness = detector.getHandedness(handNo=hand_idx)
-                descriptor.create_descriptor(lm_list, fingers, frame_shape=(height, width))
-
-                flat = []
-                for lm in lm_list:
-                    flat.extend([lm[1], lm[2]])
-
-                last_desc = descriptor.motion_history[-1] if descriptor.motion_history else None
-
-                rule_gesture = last_desc["primitive"] if last_desc else None
-                rule_conf = last_desc.get("confidence", 0) if last_desc else 0
-
-                ml_result = classifier.predict(lm_list)
-
-                result["hands"].append({
-                    "hand_index": hand_idx,
-                    "landmarks": flat,
+            sid = request.sid
+            if sid in _recording_sessions and _recording_sessions[sid].get("active"):
+                _recording_sessions[sid]["frames"].append({
+                    "landmarks": landmarks,
+                    "gesture": gesture,
                     "fingers": fingers,
-                    "gesture": rule_gesture,
-                    "confidence": rule_conf,
-                    "features": last_desc["features"] if last_desc else None,
-                    "velocity": last_desc["velocity"] if last_desc else None,
-                    "ml_gesture": ml_result.get("gesture"),
-                    "ml_confidence": ml_result.get("confidence", 0),
-                    "handedness": handedness,
+                    "confidence": confidence,
+                    "timestamp": client_ts,
                 })
-
-            # Backward-compatible: copy primary hand fields to top level
-            if result["hands"]:
-                primary = result["hands"][0]
-                result.update({
-                    "landmarks": primary["landmarks"],
-                    "fingers": primary["fingers"],
-                    "gesture": primary["gesture"],
-                    "confidence": primary["confidence"],
-                    "features": primary["features"],
-                    "velocity": primary["velocity"],
-                    "ml_gesture": primary["ml_gesture"],
-                    "ml_confidence": primary["ml_confidence"],
-                    "handedness": primary["handedness"],
-                })
-
-            # Include non-manual markers in backward-compatible fields
-            if result["face"]:
-                result["non_manual"] = result["face"]
-
-            emit("frame_result", result)
 
         except Exception as e:
-            logger.error("Frame processing error: %s", e, exc_info=True)
-            emit("frame_result", {"error": str(e)[:200], "hands_detected": False, "hands_count": 0, "hands": []})
-
-    @socketio.on("start_camera")
-    def handle_start_camera(data):
-        """Start streaming camera feed with gesture recognition (server-side camera)."""
-        sid = request.sid
-        camera_index = data.get("camera", 0)
-        width = data.get("width", 640)
-        height = data.get("height", 480)
-
-        if sid in _camera_streams and _camera_streams[sid].get("active"):
-            emit("camera_error", {"error": "Camera already streaming"})
-            return
-
-        _camera_streams[sid] = {"active": True, "camera": camera_index}
-
-        def stream_worker():
-            try:
-                import cv2
-
-                cap = cv2.VideoCapture(camera_index)
-                cap.set(3, width)
-                cap.set(4, height)
-
-                if not cap.isOpened():
-                    socketio.emit("camera_error", {"error": f"Cannot open camera {camera_index}"}, room=sid)
-                    return
-
-                detector, descriptor, classifier = _get_detector()
-
-                socketio.emit("camera_started", {"width": width, "height": height}, room=sid)
-
-                frame_count = 0
-                while _camera_streams.get(sid, {}).get("active", False):
-                    ret, img = cap.read()
-                    if not ret:
-                        break
-
-                    img = cv2.flip(img, 1)
-                    with _mediapipe_lock:
-                        with _Suppress_stderr():
-                            img = detector.findHands(img, draw=False)
-                            lm_list, bbox = detector.findPosition(img, draw=False)
-
-                    gesture_data = {
-                        "frame": frame_count,
-                        "timestamp": time.time(),
-                        "hands_detected": bool(lm_list and len(lm_list) > 0),
-                        "ml_gesture": None,
-                        "ml_confidence": 0,
-                    }
-
-                    if lm_list and len(lm_list) != 0:
-                        fingers = detector.fingersUp()
-                        descriptor.create_descriptor(lm_list, fingers, frame_shape=(height, width))
-
-                        landmarks_flat = []
-                        for lm in lm_list:
-                            landmarks_flat.extend([lm[1], lm[2]])
-
-                        last_desc = descriptor.motion_history[-1] if descriptor.motion_history else None
-
-                        # ML prediction
-                        ml_result = classifier.predict(lm_list)
-
-                        gesture_data.update({
-                            "landmarks": landmarks_flat,
-                            "fingers": fingers,
-                            "bbox": bbox,
-                            "gesture": last_desc["primitive"] if last_desc else None,
-                            "features": last_desc["features"] if last_desc else None,
-                            "velocity": last_desc["velocity"] if last_desc else None,
-                            "ml_gesture": ml_result.get("gesture"),
-                            "ml_confidence": ml_result.get("confidence", 0),
-                        })
-
-                        _, img_encoded = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 70])
-                        gesture_data["image"] = base64.b64encode(img_encoded).decode("utf-8")
-
-                    socketio.emit("gesture_frame", gesture_data, room=sid)
-                    frame_count += 1
-
-                    socketio.sleep(0.03)
-
-                cap.release()
-                socketio.emit("camera_stopped", {}, room=sid)
-
-            except Exception as e:
-                logger.error("Camera stream error: %s", e)
-                socketio.emit("camera_error", {"error": str(e)}, room=sid)
-
-        thread = threading.Thread(target=stream_worker, daemon=True)
-        thread.start()
-
-    @socketio.on("stop_camera")
-    def handle_stop_camera():
-        """Stop camera streaming."""
-        sid = request.sid
-        if sid in _camera_streams:
-            _camera_streams[sid]["active"] = False
-        emit("camera_stopping", {})
+            logger.error("Frame processing error: %s", e)
 
     @socketio.on("play_recording")
     def handle_play_recording(data):

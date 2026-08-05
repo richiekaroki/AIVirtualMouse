@@ -649,3 +649,18 @@ body::after {
     0% { transform: scale(0.3); opacity: 1; border-color: var(--accent); }
     100% { transform: scale(2); opacity: 0; border-color: transparent; }
 }
+
+/* ── Detection Loading ── */
+.detection-loading {
+    position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
+    background: rgba(15, 17, 28, 0.9); color: var(--accent);
+    padding: 10px 20px; border-radius: 12px;
+    font-family: var(--font-mono); font-size: 0.7rem;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    z-index: 20;
+    animation: pulse-glow 1.5s ease-in-out infinite;
+}
+@keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.2); }
+    50% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.4); }
+}
