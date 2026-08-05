@@ -33,7 +33,12 @@ function countFingersUp(landmarks) {
     const fingers = [];
     if (!landmarks || landmarks.length < 21) return fingers;
     const lm = landmarks;
-    fingers.push(lm[4].x < lm[3].x ? 1 : 0);
+    const wrist = lm[0];
+    const thumbIp = lm[3];
+    const thumbTip = lm[4];
+    const thumbDist = Math.hypot(thumbTip.x - wrist.x, thumbTip.y - wrist.y);
+    const thumbIpDist = Math.hypot(thumbIp.x - wrist.x, thumbIp.y - wrist.y);
+    fingers.push(thumbDist > thumbIpDist ? 1 : 0);
     for (let i = 1; i < 5; i++) {
         fingers.push(lm[TIP_IDS[i]].y < lm[PIP_IDS[i]].y ? 1 : 0);
     }
@@ -44,32 +49,40 @@ function classifyGesture(fingers, landmarks) {
     if (!fingers || fingers.length < 5) return null;
     const [t, i, m, r, p] = fingers;
     const count = t + i + m + r + p;
-    const allUp = t && i && m && r && p;
-    const allDown = !t && !i && !m && !r && !p;
     const lm = landmarks;
-    if (allUp) return 'OPEN_HAND';
-    if (allDown) return 'FIST';
-    if (i && !m && !r && !p) return 'POINT';
-    if (i && m && !r && !p) return 'PEACE_V';
+
+    if (count === 5) return 'OPEN_HAND';
+    if (count === 0) return 'FIST';
+
+    if (i && m && r && p && t) return 'OPEN_HAND';
+    if (!i && !m && !r && !p && !t) return 'FIST';
+
     if (t && !i && !m && !r && !p) return 'THUMBS_UP';
+
+    if (!t && i && !m && !r && !p) return 'POINT';
+
+    if (!t && i && m && !r && !p) return 'PEACE_V';
+
     if (t && i && !m && !r && !p) {
         const d = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
-        if (d < 0.06) return 'OK_SIGN';
+        if (d < 0.07) return 'OK_SIGN';
+        return 'GUN';
     }
-    if (!t && i && !m && !r && p) return 'SHAKA';
-    if (t && !i && !m && !r && p) return 'PINKY';
-    if (t && i && !m && !r && !p) return 'GUN';
-    if (i && m && r && !p && !t) return 'FOUR';
-    if (i && m && r && p) return 'FIVE';
-    if (!i && m && r && p && !t) return 'THREE';
-    if (!t && i && m && !r && !p) return 'LOVE';
-    if (t && i && !m && r && p) return 'SPIDER';
+
+    if (i && m && r && p && !t) return 'FOUR';
+
+    if (t && i && m && r && p) return 'FIVE';
+
+    if (!t && i && m && r && !p) return 'THREE';
+
+    if (t && i && m && !r && !p) return 'LOVE';
+
+    if (t && !i && !m && !r && p) return 'SHAKA';
+
     if (!t && i && m && r && p) return 'ROCK';
+
     if (count === 2 && i && p && !t && !m && !r) return 'HANG_LOOSE';
-    if (t && !i && !m && !r && !p) {
-        const thumbUp = lm[4].y < lm[3].y;
-        if (thumbUp) return 'THUMBS_UP';
-    }
+
     return null;
 }
 
@@ -204,8 +217,8 @@ function fireClickAt(x, y) {
 
 /* ── Onboarding ── */
 const ONBOARD_STEPS = [
-    { gesture: 'OPEN_HAND', emoji: '\u{1F590}\uFE0F', name: 'Open Hand', hint: 'Spread all five fingers and hold your hand open' },
-    { gesture: 'FIST', emoji: '\u270A', name: 'Fist', hint: 'Close all five fingers into a tight fist' },
+    { gesture: 'OPEN_HAND', emoji: '\u{1F590}\uFE0F', name: 'Open Hand', hint: 'Spread all five fingers wide open' },
+    { gesture: 'FIST', emoji: '\u270A', name: 'Fist', hint: 'Close all fingers into a tight fist' },
     { gesture: 'POINT', emoji: '\u261D\uFE0F', name: 'Point', hint: 'Extend only your index finger' },
 ];
 
