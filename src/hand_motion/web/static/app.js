@@ -20,12 +20,14 @@ let cursorX = 0, cursorY = 0;
 let cursorSmoothX = 0, cursorSmoothY = 0;
 let cursorClicking = false;
 let lastClickTime = 0;
-const SMOOTHING = 0.35;
-const CLICK_COOLDOWN = 400;
+let cursorTrail = [];
+const SMOOTHING = 0.28;
+const CLICK_COOLDOWN = 350;
 
 /* ── Gesture Detection Rules ── */
 const TIP_IDS = [4, 8, 12, 16, 20];
 const MCP_IDS = [2, 5, 9, 13, 17];
+const PIP_IDS = [3, 6, 10, 14, 18];
 
 function countFingersUp(landmarks) {
     const fingers = [];
@@ -33,7 +35,7 @@ function countFingersUp(landmarks) {
     const lm = landmarks;
     fingers.push(lm[4].x < lm[3].x ? 1 : 0);
     for (let i = 1; i < 5; i++) {
-        fingers.push(lm[TIP_IDS[i]].y < lm[MCP_IDS[i]].y ? 1 : 0);
+        fingers.push(lm[TIP_IDS[i]].y < lm[PIP_IDS[i]].y ? 1 : 0);
     }
     return fingers;
 }
@@ -41,24 +43,33 @@ function countFingersUp(landmarks) {
 function classifyGesture(fingers, landmarks) {
     if (!fingers || fingers.length < 5) return null;
     const [t, i, m, r, p] = fingers;
+    const count = t + i + m + r + p;
     const allUp = t && i && m && r && p;
     const allDown = !t && !i && !m && !r && !p;
+    const lm = landmarks;
     if (allUp) return 'OPEN_HAND';
     if (allDown) return 'FIST';
     if (i && !m && !r && !p) return 'POINT';
     if (i && m && !r && !p) return 'PEACE_V';
     if (t && !i && !m && !r && !p) return 'THUMBS_UP';
     if (t && i && !m && !r && !p) {
-        const d = Math.hypot(landmarks[4].x - landmarks[8].x, landmarks[4].y - landmarks[8].y);
+        const d = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
         if (d < 0.06) return 'OK_SIGN';
     }
     if (!t && i && !m && !r && p) return 'SHAKA';
     if (t && !i && !m && !r && p) return 'PINKY';
     if (t && i && !m && !r && !p) return 'GUN';
-    if (i && m && r && !p) return 'FOUR';
+    if (i && m && r && !p && !t) return 'FOUR';
     if (i && m && r && p) return 'FIVE';
-    if (!i && m && r && p) return 'THREE';
-    if (!t && i && m && !r && !p) return 'GRAB';
+    if (!i && m && r && p && !t) return 'THREE';
+    if (!t && i && m && !r && !p) return 'LOVE';
+    if (t && i && !m && r && p) return 'SPIDER';
+    if (!t && i && m && r && p) return 'ROCK';
+    if (count === 2 && i && p && !t && !m && !r) return 'HANG_LOOSE';
+    if (t && !i && !m && !r && !p) {
+        const thumbUp = lm[4].y < lm[3].y;
+        if (thumbUp) return 'THUMBS_UP';
+    }
     return null;
 }
 
@@ -132,6 +143,9 @@ function updateCursor(lm) {
     cursorX = cursorSmoothX;
     cursorY = cursorSmoothY;
     moveCursorIndicator(cursorX, cursorY);
+    cursorTrail.push({ x: cursorX, y: cursorY, t: Date.now() });
+    if (cursorTrail.length > 8) cursorTrail.shift();
+    drawCursorTrail();
     checkClickGesture(lm);
 }
 
@@ -140,6 +154,22 @@ function moveCursorIndicator(x, y) {
     if (!el) return;
     el.style.left = x + 'px';
     el.style.top = y + 'px';
+}
+
+function drawCursorTrail() {
+    if (cursorTrail.length < 2) return;
+    const now = Date.now();
+    for (let i = 1; i < cursorTrail.length; i++) {
+        const p = cursorTrail[i];
+        const age = (now - p.t) / 300;
+        if (age > 1) continue;
+        const alpha = (1 - age) * 0.4;
+        const size = (1 - age) * 3;
+        const el = document.createElement('div');
+        el.style.cssText = `position:fixed;left:${p.x}px;top:${p.y}px;width:${size}px;height:${size}px;border-radius:50%;background:rgba(245,158,11,${alpha});pointer-events:none;z-index:9998;transform:translate(-50%,-50%)`;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 300);
+    }
 }
 
 function checkClickGesture(lm) {
@@ -218,24 +248,41 @@ function drawSkeleton(landmarks, handIdx = 0) {
     if (!ctx || !canvasEl || !landmarks || landmarks.length < 21) return;
     const w = canvasEl.width, h = canvasEl.height;
     const conns = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
-    const colors = [
-        { line: 'rgba(245,158,11,0.7)', tip: '#F59E0B', joint: '#E8E8EC' },
-        { line: 'rgba(167,139,250,0.7)', tip: '#A78BFA', joint: '#C4B5FD' },
+    const palettes = [
+        { line: '#F59E0B', glow: 'rgba(245,158,11,0.35)', tip: '#FBBF24', joint: '#E8E8EC' },
+        { line: '#A78BFA', glow: 'rgba(167,139,250,0.35)', tip: '#C4B5FD', joint: '#DDD6FE' },
     ];
-    const c = colors[handIdx % colors.length];
-    ctx.strokeStyle = c.line; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+    const c = palettes[handIdx % palettes.length];
+    ctx.save();
+    ctx.shadowColor = c.glow;
+    ctx.shadowBlur = 12;
+    ctx.strokeStyle = c.line;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
     for (const [a, b] of conns) {
         ctx.beginPath();
         ctx.moveTo(landmarks[a].x * w, landmarks[a].y * h);
         ctx.lineTo(landmarks[b].x * w, landmarks[b].y * h);
         ctx.stroke();
     }
+    ctx.shadowBlur = 0;
     for (let i = 0; i < 21; i++) {
         const x = landmarks[i].x * w, y = landmarks[i].y * h;
         const tip = TIP_IDS.includes(i);
         ctx.fillStyle = tip ? c.tip : c.joint;
-        ctx.beginPath(); ctx.arc(x, y, tip ? 5 : 3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x, y, tip ? 5.5 : 3, 0, Math.PI * 2);
+        ctx.fill();
+        if (tip) {
+            ctx.strokeStyle = c.line;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(x, y, 8, 0, Math.PI * 2);
+            ctx.stroke();
+        }
     }
+    ctx.restore();
 }
 
 function clearOverlay() { if (ctx) ctx.clearRect(0, 0, canvasEl.width, canvasEl.height); }
@@ -351,6 +398,7 @@ const GESTURE_ICONS = {
     PINCH:'\u{1F90F}', OK_SIGN:'\u{1F44C}', WAVE:'\u{1F44B}', CIRCLE:'\u{2B55}', GRAB:'\u{1F91F}',
     PUSH:'\u{1F446}', SWIPE_LEFT:'\u{2B05}', SWIPE_RIGHT:'\u{27A1}', THREE:'\u{1F446}', FOUR:'\u{1F44F}',
     PINKY:'\u{1F91E}', GUN:'\u{1F52B}', SPIDER:'\u{1F577}', ROCK:'\u{1F918}', SHAKA:'\u{1F44F}',
+    LOVE:'\u{1F48C}', HANG_LOOSE:'\u{1F596}', FIVE:'\u270B', THREE_FINGERS:'\u2620',
 };
 function toggleRecord() {
     isRecording = !isRecording;
@@ -386,9 +434,9 @@ async function initMediaPipe() {
     });
     hands.setOptions({
         maxNumHands: 2,
-        modelComplexity: 0,
-        minDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.5
+        modelComplexity: 1,
+        minDetectionConfidence: 0.7,
+        minTrackingConfidence: 0.6
     });
     hands.onResults(onHandResults);
     mpHands = hands;
